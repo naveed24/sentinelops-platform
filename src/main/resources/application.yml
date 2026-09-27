@@ -1,0 +1,30 @@
+spring:
+  application:
+    name: sentinelops-platform
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/sentinelops}
+    username: ${DB_USERNAME:sentinelops}
+    password: ${DB_PASSWORD:sentinelops}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+server:
+  shutdown: graceful
