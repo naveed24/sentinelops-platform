@@ -1,6 +1,6 @@
 package com.sentinelops.incident;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.sentinelops.service.ServiceRecord;
 import com.sentinelops.service.ServiceRepository;
 import com.sentinelops.service.ServiceStatus;
