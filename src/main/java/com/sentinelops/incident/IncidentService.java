@@ -39,8 +39,17 @@ public class IncidentService {
         return IncidentDtos.IncidentResponse.from(find(id));
     }
 
-    public List<IncidentDtos.IncidentResponse> list() {
-        return incidents.findAll().stream().map(IncidentDtos.IncidentResponse::from).toList();
+    public List<IncidentDtos.IncidentResponse> list(
+            IncidentStatus status,
+            IncidentSeverity severity,
+            Long serviceId) {
+        var specification = IncidentSpecifications.hasStatus(status)
+                .and(IncidentSpecifications.hasSeverity(severity))
+                .and(IncidentSpecifications.belongsToService(serviceId));
+
+        return incidents.findAll(specification).stream()
+                .map(IncidentDtos.IncidentResponse::from)
+                .toList();
     }
 
     public List<IncidentDtos.AuditResponse> history(Long id) {
