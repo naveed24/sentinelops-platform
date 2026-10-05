@@ -22,8 +22,11 @@ public class IncidentController {
     }
 
     @GetMapping
-    public List<IncidentDtos.IncidentResponse> list() {
-        return incidentService.list();
+    public List<IncidentDtos.IncidentResponse> list(
+            @RequestParam(required = false) IncidentStatus status,
+            @RequestParam(required = false) IncidentSeverity severity,
+            @RequestParam(required = false) Long serviceId) {
+        return incidentService.list(status, severity, serviceId);
     }
 
     @GetMapping("/{id}")
