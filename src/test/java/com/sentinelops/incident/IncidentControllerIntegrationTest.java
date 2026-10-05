@@ -98,4 +98,54 @@ class IncidentControllerIntegrationTest {
                 .andExpect(jsonPath("$.message").value(
                         "Invalid incident transition: OPEN -> RESOLVED"));
     }
+
+    @Test
+    void filtersIncidentsByStatusSeverityAndService() throws Exception {
+        var service = serviceRepository.save(ServiceRecord.builder()
+                .name("incident-filter-service")
+                .ownerTeam("platform")
+                .status(ServiceStatus.ACTIVE)
+                .build());
+
+        var acknowledged = mockMvc.perform(post("/api/v1/incidents")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "title", "Filtered incident",
+                                "severity", "SEV2",
+                                "serviceId", service.getId()
+                        ))))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        mockMvc.perform(post("/api/v1/incidents")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "title", "Different severity",
+                                "severity", "SEV3",
+                                "serviceId", service.getId()
+                        ))))
+                .andExpect(status().isCreated());
+
+        long acknowledgedId = objectMapper.readTree(
+                acknowledged.getResponse().getContentAsString()).get("id").asLong();
+
+        mockMvc.perform(patch("/api/v1/incidents/{id}/status", acknowledgedId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "status", "ACKNOWLEDGED",
+                                "message", "Accepted by on-call"
+                        ))))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/incidents")
+                        .param("status", "ACKNOWLEDGED")
+                        .param("severity", "SEV2")
+                        .param("serviceId", service.getId().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].title").value("Filtered incident"))
+                .andExpect(jsonPath("$[0].status").value("ACKNOWLEDGED"))
+                .andExpect(jsonPath("$[0].severity").value("SEV2"))
+                .andExpect(jsonPath("$[0].serviceId").value(service.getId()));
+    }
 }
