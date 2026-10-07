@@ -11,13 +11,11 @@ import java.util.List;
 @RequestMapping("/api/v1/incidents")
 @RequiredArgsConstructor
 public class IncidentController {
-
     private final IncidentService incidentService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public IncidentDtos.IncidentResponse create(
-            @Valid @RequestBody IncidentDtos.CreateIncidentRequest request) {
+    public IncidentDtos.IncidentResponse create(@Valid @RequestBody IncidentDtos.CreateIncidentRequest request) {
         return incidentService.create(request);
     }
 
@@ -25,8 +23,9 @@ public class IncidentController {
     public List<IncidentDtos.IncidentResponse> list(
             @RequestParam(required = false) IncidentStatus status,
             @RequestParam(required = false) IncidentSeverity severity,
-            @RequestParam(required = false) Long serviceId) {
-        return incidentService.list(status, severity, serviceId);
+            @RequestParam(required = false) Long serviceId,
+            @RequestParam(defaultValue = "100") int limit) {
+        return incidentService.list(status, severity, serviceId, limit);
     }
 
     @GetMapping("/{id}")
@@ -41,8 +40,7 @@ public class IncidentController {
 
     @PatchMapping("/{id}/status")
     public IncidentDtos.IncidentResponse transition(
-            @PathVariable Long id,
-            @Valid @RequestBody IncidentDtos.TransitionRequest request) {
+            @PathVariable Long id, @Valid @RequestBody IncidentDtos.TransitionRequest request) {
         return incidentService.transition(id, request);
     }
 }
