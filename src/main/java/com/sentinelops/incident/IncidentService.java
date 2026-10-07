@@ -3,6 +3,8 @@ package com.sentinelops.incident;
 import com.sentinelops.common.NotFoundException;
 import com.sentinelops.service.ServiceRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
@@ -18,63 +20,34 @@ public class IncidentService {
 
     @Transactional
     public IncidentDtos.IncidentResponse create(IncidentDtos.CreateIncidentRequest request) {
-        var target = services.findById(request.serviceId())
-                .orElseThrow(() -> new NotFoundException("Service not found: " + request.serviceId()));
-        var incident = incidents.save(Incident.builder()
-                .title(request.title().trim())
-                .description(request.description())
-                .severity(request.severity())
-                .status(IncidentStatus.OPEN)
-                .service(target)
-                .build());
-        audit.save(IncidentAuditEvent.builder()
-                .incidentId(incident.getId())
-                .toStatus(IncidentStatus.OPEN)
-                .message("Incident created")
-                .build());
+        var target = services.findById(request.serviceId()).orElseThrow(() -> new NotFoundException("Service not found: " + request.serviceId()));
+        var incident = incidents.save(Incident.builder().title(request.title().trim()).description(request.description()).severity(request.severity()).status(IncidentStatus.OPEN).service(target).build());
+        audit.save(IncidentAuditEvent.builder().incidentId(incident.getId()).toStatus(IncidentStatus.OPEN).message("Incident created").build());
         return IncidentDtos.IncidentResponse.from(incident);
     }
 
-    public IncidentDtos.IncidentResponse get(Long id) {
-        return IncidentDtos.IncidentResponse.from(find(id));
-    }
+    public IncidentDtos.IncidentResponse get(Long id) { return IncidentDtos.IncidentResponse.from(find(id)); }
 
-    public List<IncidentDtos.IncidentResponse> list(
-            IncidentStatus status,
-            IncidentSeverity severity,
-            Long serviceId) {
-        var specification = IncidentSpecifications.hasStatus(status)
-                .and(IncidentSpecifications.hasSeverity(severity))
-                .and(IncidentSpecifications.belongsToService(serviceId));
-
-        return incidents.findAll(specification).stream()
-                .map(IncidentDtos.IncidentResponse::from)
-                .toList();
+    public List<IncidentDtos.IncidentResponse> list(IncidentStatus status, IncidentSeverity severity, Long serviceId, int limit) {
+        if (limit < 1 || limit > 200) throw new IllegalArgumentException("limit must be between 1 and 200");
+        var specification = IncidentSpecifications.hasStatus(status).and(IncidentSpecifications.hasSeverity(severity)).and(IncidentSpecifications.belongsToService(serviceId));
+        var page = PageRequest.of(0, limit, Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by(Sort.Direction.DESC, "id")));
+        return incidents.findAll(specification, page).stream().map(IncidentDtos.IncidentResponse::from).toList();
     }
 
     public List<IncidentDtos.AuditResponse> history(Long id) {
         find(id);
-        return audit.findByIncidentIdOrderByCreatedAtAsc(id).stream()
-                .map(IncidentDtos.AuditResponse::from).toList();
+        return audit.findByIncidentIdOrderByCreatedAtAsc(id).stream().map(IncidentDtos.AuditResponse::from).toList();
     }
 
     @Transactional
     public IncidentDtos.IncidentResponse transition(Long id, IncidentDtos.TransitionRequest request) {
-        var incident = find(id);
-        var from = incident.getStatus();
-        var to = request.status();
-        if (!allowed(from, to)) {
-            throw new IllegalArgumentException("Invalid incident transition: " + from + " -> " + to);
-        }
+        var incident = find(id); var from = incident.getStatus(); var to = request.status();
+        if (!allowed(from, to)) throw new IllegalArgumentException("Invalid incident transition: " + from + " -> " + to);
         incident.setStatus(to);
         if (to == IncidentStatus.RESOLVED) incident.setResolvedAt(Instant.now());
         incident = incidents.save(incident);
-        audit.save(IncidentAuditEvent.builder()
-                .incidentId(incident.getId())
-                .fromStatus(from)
-                .toStatus(to)
-                .message(request.message().trim())
-                .build());
+        audit.save(IncidentAuditEvent.builder().incidentId(incident.getId()).fromStatus(from).toStatus(to).message(request.message().trim()).build());
         return IncidentDtos.IncidentResponse.from(incident);
     }
 
@@ -87,8 +60,5 @@ public class IncidentService {
         };
     }
 
-    private Incident find(Long id) {
-        return incidents.findById(id)
-                .orElseThrow(() -> new NotFoundException("Incident not found: " + id));
-    }
+    private Incident find(Long id) { return incidents.findById(id).orElseThrow(() -> new NotFoundException("Incident not found: " + id)); }
 }
