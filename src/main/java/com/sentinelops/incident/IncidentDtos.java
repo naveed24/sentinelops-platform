@@ -19,7 +19,11 @@ public final class IncidentDtos {
     public record TransitionRequest(
             @NotNull IncidentStatus status,
             @NotBlank @Size(max = 500) String message,
-            @PositiveOrZero Long expectedVersion) {}
+            @PositiveOrZero Long expectedVersion) {
+        public TransitionRequest(IncidentStatus status, String message) {
+            this(status, message, null);
+        }
+    }
 
     public record IncidentResponse(
             Long id, String title, String description, IncidentSeverity severity,
