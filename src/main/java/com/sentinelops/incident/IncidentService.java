@@ -28,11 +28,24 @@ public class IncidentService {
 
     public IncidentDtos.IncidentResponse get(Long id) { return IncidentDtos.IncidentResponse.from(find(id)); }
 
-    public List<IncidentDtos.IncidentResponse> list(IncidentStatus status, IncidentSeverity severity, Long serviceId, int limit) {
-        if (limit < 1 || limit > 200) throw new IllegalArgumentException("limit must be between 1 and 200");
-        var specification = IncidentSpecifications.hasStatus(status).and(IncidentSpecifications.hasSeverity(severity)).and(IncidentSpecifications.belongsToService(serviceId));
-        var page = PageRequest.of(0, limit, Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by(Sort.Direction.DESC, "id")));
-        return incidents.findAll(specification, page).stream().map(IncidentDtos.IncidentResponse::from).toList();
+    public List<IncidentDtos.IncidentResponse> list(
+            IncidentStatus status, IncidentSeverity severity, Long serviceId, int limit, int page) {
+        if (limit < 1 || limit > 200) {
+            throw new IllegalArgumentException("limit must be between 1 and 200");
+        }
+        if (page < 0 || page > 1000) {
+            throw new IllegalArgumentException("page must be between 0 and 1000");
+        }
+
+        var specification = IncidentSpecifications.hasStatus(status)
+                .and(IncidentSpecifications.hasSeverity(severity))
+                .and(IncidentSpecifications.belongsToService(serviceId));
+        var ordering = Sort.by(Sort.Direction.DESC, "createdAt")
+                .and(Sort.by(Sort.Direction.DESC, "id"));
+        var pageable = PageRequest.of(page, limit, ordering);
+        return incidents.findAll(specification, pageable).stream()
+                .map(IncidentDtos.IncidentResponse::from)
+                .toList();
     }
 
     public List<IncidentDtos.AuditResponse> history(Long id) {
