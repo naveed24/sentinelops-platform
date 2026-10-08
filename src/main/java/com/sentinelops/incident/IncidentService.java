@@ -1,6 +1,7 @@
 package com.sentinelops.incident;
 
 import com.sentinelops.common.NotFoundException;
+import com.sentinelops.common.ConflictException;
 import com.sentinelops.service.ServiceRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -42,11 +43,19 @@ public class IncidentService {
 
     @Transactional
     public IncidentDtos.IncidentResponse transition(Long id, IncidentDtos.TransitionRequest request) {
-        var incident = find(id); var from = incident.getStatus(); var to = request.status();
+        var incident = find(id);
+        if (request.expectedVersion() != null && !request.expectedVersion().equals(incident.getVersion())) {
+            throw new ConflictException("Incident version conflict: expected " + request.expectedVersion()
+                    + " but was " + incident.getVersion());
+        }
+        var from = incident.getStatus();
+        var to = request.status();
         if (!allowed(from, to)) throw new IllegalArgumentException("Invalid incident transition: " + from + " -> " + to);
         incident.setStatus(to);
         if (to == IncidentStatus.RESOLVED) incident.setResolvedAt(Instant.now());
-        incident = incidents.save(incident);
+        // Flush the versioned update before inserting the audit event.
+        // A concurrent update fails the transaction and rolls back the audit.
+        incident = incidents.saveAndFlush(incident);
         audit.save(IncidentAuditEvent.builder().incidentId(incident.getId()).fromStatus(from).toStatus(to).message(request.message().trim()).build());
         return IncidentDtos.IncidentResponse.from(incident);
     }

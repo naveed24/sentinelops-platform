@@ -2,6 +2,7 @@ package com.sentinelops.incident;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.util.List;
@@ -17,7 +18,8 @@ public final class IncidentDtos {
 
     public record TransitionRequest(
             @NotNull IncidentStatus status,
-            @NotBlank @Size(max = 500) String message) {}
+            @NotBlank @Size(max = 500) String message,
+            @PositiveOrZero Long expectedVersion) {}
 
     public record IncidentResponse(
             Long id, String title, String description, IncidentSeverity severity,

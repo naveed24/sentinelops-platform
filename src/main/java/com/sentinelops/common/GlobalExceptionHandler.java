@@ -1,6 +1,7 @@
 package com.sentinelops.common;
 
 import org.springframework.http.*;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
 import java.time.Instant;
@@ -19,6 +20,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ConflictException.class)
     ResponseEntity<ApiError> conflict(ConflictException ex) {
         return build(HttpStatus.CONFLICT, ex.getMessage(), Map.of());
+    }
+
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    ResponseEntity<ApiError> optimisticConflict(OptimisticLockingFailureException ex) {
+        return build(HttpStatus.CONFLICT, "Incident was updated concurrently; reload and retry", Map.of());
     }
 
     @ExceptionHandler({IllegalArgumentException.class})
