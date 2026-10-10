@@ -1,16 +1,21 @@
 package com.sentinelops.incident;
 
+import com.sentinelops.identity.TeamRepository;
+import com.sentinelops.identity.UserAccountRepository;
 import tools.jackson.databind.ObjectMapper;
 import com.sentinelops.service.ServiceRecord;
 import com.sentinelops.service.ServiceRepository;
 import com.sentinelops.service.ServiceStatus;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import java.util.Map;
 
@@ -25,6 +30,31 @@ class IncidentControllerIntegrationTest {
     @Autowired MockMvc mockMvc;
     @Autowired ObjectMapper objectMapper;
     @Autowired ServiceRepository serviceRepository;
+    @Autowired UserAccountRepository userAccounts;
+    @Autowired TeamRepository teams;
+
+    private String adminToken;
+
+    @BeforeEach
+    void bootstrapAdmin() throws Exception {
+        userAccounts.deleteAll();
+        teams.deleteAll();
+
+        var result = mockMvc.perform(post("/api/v1/auth/bootstrap")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "teamName", "Incident Operations",
+                                "teamSlug", "incident-operations",
+                                "email", "incident-admin@example.com",
+                                "displayName", "Incident Admin",
+                                "password", "incident-admin-password"
+                        ))))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        adminToken = objectMapper.readTree(
+                result.getResponse().getContentAsString()).get("accessToken").asText();
+    }
 
     @Test
     void exposesCreateTransitionAndAuditHistory() throws Exception {
@@ -41,7 +71,7 @@ class IncidentControllerIntegrationTest {
                 "serviceId", service.getId()
         );
 
-        var createResult = mockMvc.perform(post("/api/v1/incidents")
+        var createResult = mockMvc.perform(authorized(post("/api/v1/incidents"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(createBody)))
                 .andExpect(status().isCreated())
@@ -52,7 +82,7 @@ class IncidentControllerIntegrationTest {
         long incidentId = objectMapper.readTree(
                 createResult.getResponse().getContentAsString()).get("id").asLong();
 
-        mockMvc.perform(patch("/api/v1/incidents/{id}/status", incidentId)
+        mockMvc.perform(authorized(patch("/api/v1/incidents/{id}/status", incidentId))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "status", "ACKNOWLEDGED",
@@ -61,7 +91,7 @@ class IncidentControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("ACKNOWLEDGED"));
 
-        mockMvc.perform(get("/api/v1/incidents/{id}/history", incidentId))
+        mockMvc.perform(authorized(get("/api/v1/incidents/{id}/history", incidentId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].toStatus").value("OPEN"))
                 .andExpect(jsonPath("$[1].toStatus").value("ACKNOWLEDGED"));
@@ -75,7 +105,7 @@ class IncidentControllerIntegrationTest {
                 .status(ServiceStatus.ACTIVE)
                 .build());
 
-        var created = mockMvc.perform(post("/api/v1/incidents")
+        var created = mockMvc.perform(authorized(post("/api/v1/incidents"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "title", "Database saturation",
@@ -88,7 +118,7 @@ class IncidentControllerIntegrationTest {
         long incidentId = objectMapper.readTree(
                 created.getResponse().getContentAsString()).get("id").asLong();
 
-        mockMvc.perform(patch("/api/v1/incidents/{id}/status", incidentId)
+        mockMvc.perform(authorized(patch("/api/v1/incidents/{id}/status", incidentId))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "status", "RESOLVED",
@@ -107,7 +137,7 @@ class IncidentControllerIntegrationTest {
                 .status(ServiceStatus.ACTIVE)
                 .build());
 
-        var acknowledged = mockMvc.perform(post("/api/v1/incidents")
+        var acknowledged = mockMvc.perform(authorized(post("/api/v1/incidents"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "title", "Filtered incident",
@@ -117,7 +147,7 @@ class IncidentControllerIntegrationTest {
                 .andExpect(status().isCreated())
                 .andReturn();
 
-        mockMvc.perform(post("/api/v1/incidents")
+        mockMvc.perform(authorized(post("/api/v1/incidents"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "title", "Different severity",
@@ -129,7 +159,7 @@ class IncidentControllerIntegrationTest {
         long acknowledgedId = objectMapper.readTree(
                 acknowledged.getResponse().getContentAsString()).get("id").asLong();
 
-        mockMvc.perform(patch("/api/v1/incidents/{id}/status", acknowledgedId)
+        mockMvc.perform(authorized(patch("/api/v1/incidents/{id}/status", acknowledgedId))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "status", "ACKNOWLEDGED",
@@ -137,7 +167,7 @@ class IncidentControllerIntegrationTest {
                         ))))
                 .andExpect(status().isOk());
 
-        mockMvc.perform(get("/api/v1/incidents")
+        mockMvc.perform(authorized(get("/api/v1/incidents"))
                         .param("status", "ACKNOWLEDGED")
                         .param("severity", "SEV2")
                         .param("serviceId", service.getId().toString()))
@@ -147,5 +177,9 @@ class IncidentControllerIntegrationTest {
                 .andExpect(jsonPath("$[0].status").value("ACKNOWLEDGED"))
                 .andExpect(jsonPath("$[0].severity").value("SEV2"))
                 .andExpect(jsonPath("$[0].serviceId").value(service.getId()));
+    }
+
+    private MockHttpServletRequestBuilder authorized(MockHttpServletRequestBuilder request) {
+        return request.header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken);
     }
 }
