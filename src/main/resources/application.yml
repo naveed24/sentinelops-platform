@@ -16,6 +16,13 @@ spring:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
 
+sentinelops:
+  security:
+    jwt:
+      secret: ${JWT_SECRET:}
+      issuer: sentinelops
+      ttl: PT1H
+
 management:
   endpoints:
     web:

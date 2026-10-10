@@ -13,3 +13,10 @@ spring:
     redis:
       repositories:
         enabled: false
+
+sentinelops:
+  security:
+    jwt:
+      secret: test-secret-that-is-long-enough-for-hmac-sha256-signing
+      issuer: sentinelops-test
+      ttl: PT1H
