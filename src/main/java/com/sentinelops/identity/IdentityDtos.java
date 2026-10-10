@@ -37,6 +37,7 @@ public final class IdentityDtos {
     public record CreateUserRequest(
             @NotBlank @Email @Size(max = 254) String email,
             @NotBlank @Size(max = 140) String displayName,
+            @NotBlank @Size(min = 12, max = 128) String password,
             @NotNull UserRole role,
             @NotNull Long teamId
     ) {}
