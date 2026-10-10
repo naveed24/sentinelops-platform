@@ -4,6 +4,7 @@ import com.sentinelops.common.ConflictException;
 import com.sentinelops.common.NotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,6 +18,7 @@ public class UserAccountService {
 
     private final UserAccountRepository users;
     private final TeamService teams;
+    private final PasswordEncoder passwordEncoder;
 
     @Transactional
     public IdentityDtos.UserResponse create(IdentityDtos.CreateUserRequest request) {
@@ -28,6 +30,7 @@ public class UserAccountService {
         UserAccount user = UserAccount.builder()
                 .email(email)
                 .displayName(request.displayName().trim())
+                .passwordHash(passwordEncoder.encode(request.password()))
                 .role(request.role())
                 .status(UserStatus.ACTIVE)
                 .team(teams.find(request.teamId()))
