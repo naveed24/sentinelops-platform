@@ -198,7 +198,7 @@ class SecurityIntegrationTest {
         mockMvc.perform(patch("/api/v1/services/1/status")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + responderToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\\"status\\":\\"INACTIVE\\"}"))
+                        .content(objectMapper.writeValueAsString(Map.of("status", "MAINTENANCE"))))
                 .andExpect(status().isForbidden());
 
         String serviceName = "rbac-test-service-" + System.nanoTime();
@@ -218,9 +218,9 @@ class SecurityIntegrationTest {
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
-                                Map.of("status", "INACTIVE"))))
+                                Map.of("status", "MAINTENANCE"))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("INACTIVE"));
+                .andExpect(jsonPath("$.status").value("MAINTENANCE"));
 
         mockMvc.perform(get("/actuator/metrics")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
