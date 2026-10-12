@@ -42,13 +42,19 @@ public class SecurityConfig {
                                 "/actuator/health",
                                 "/actuator/health/**"
                         ).permitAll()
+                        .requestMatchers("/actuator/**")
+                        .hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/services/**")
+                        .hasAnyRole("ADMIN", "RESPONDER", "VIEWER")
+                        .requestMatchers("/api/v1/services/**")
+                        .hasRole("ADMIN")
                         .requestMatchers("/api/v1/users/**", "/api/v1/teams/**")
                         .hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/incidents/**")
                         .hasAnyRole("ADMIN", "RESPONDER", "VIEWER")
                         .requestMatchers("/api/v1/incidents/**")
                         .hasAnyRole("ADMIN", "RESPONDER")
-                        .anyRequest().permitAll())
+                        .anyRequest().authenticated())
                 .addFilterBefore(
                         jwtAuthenticationFilter,
                         UsernamePasswordAuthenticationFilter.class);
