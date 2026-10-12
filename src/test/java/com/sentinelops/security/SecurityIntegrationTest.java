@@ -158,6 +158,75 @@ class SecurityIntegrationTest {
                         "Bootstrap is only available before the first user is created"));
     }
 
+    @Test
+    void securesServiceRegistryAndOperationalMetricsByRole() throws Exception {
+        // Liveness/readiness remain callable by infrastructure without a token.
+        mockMvc.perform(get("/actuator/health"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/services"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/api/v1/services")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/actuator/metrics"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/actuator/prometheus"))
+                .andExpect(status().isUnauthorized());
+
+        String viewerToken = createUserAndLogin(
+                "services-viewer@example.com", "VIEWER", "services-viewer-password");
+
+        mockMvc.perform(get("/api/v1/services")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + viewerToken))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/services")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + viewerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/actuator/metrics")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + viewerToken))
+                .andExpect(status().isForbidden());
+
+        String responderToken = createUserAndLogin(
+                "services-responder@example.com", "RESPONDER", "services-responder-password");
+        mockMvc.perform(get("/api/v1/services")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + responderToken))
+                .andExpect(status().isOk());
+        mockMvc.perform(patch("/api/v1/services/1/status")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + responderToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\\"status\\":\\"INACTIVE\\"}"))
+                .andExpect(status().isForbidden());
+
+        String serviceName = "rbac-test-service-" + System.nanoTime();
+        var response = mockMvc.perform(post("/api/v1/services")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "name", serviceName,
+                                "ownerTeam", "platform"
+                        ))))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long serviceId = objectMapper.readTree(
+                response.getResponse().getContentAsString()).get("id").asLong();
+
+        mockMvc.perform(patch("/api/v1/services/{id}/status", serviceId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                Map.of("status", "INACTIVE"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("INACTIVE"));
+
+        mockMvc.perform(get("/actuator/metrics")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+                .andExpect(status().isOk());
+    }
+
     private String createUserAndLogin(String email, String role, String password)
             throws Exception {
         mockMvc.perform(post("/api/v1/users")
