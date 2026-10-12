@@ -160,8 +160,8 @@ class SecurityIntegrationTest {
 
     @Test
     void securesServiceRegistryAndOperationalMetricsByRole() throws Exception {
-        // Liveness/readiness remain callable by infrastructure without a token.
-        mockMvc.perform(get("/actuator/health"))
+        // The public liveness probe is independent of Redis and database health.
+        mockMvc.perform(get("/actuator/health/liveness"))
                 .andExpect(status().isOk());
 
         mockMvc.perform(get("/api/v1/services"))
