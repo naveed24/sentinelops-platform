@@ -22,6 +22,14 @@ public class IncidentAuditEvent {
     @Column(name = "to_status", nullable = false, length = 30)
     private IncidentStatus toStatus;
 
+    // Nullable for events recorded before V6 and for internal/system-originated actions.
+    // Keep a snapshot so history remains interpretable when user details change.
+    @Column(name = "actor_user_id", updatable = false)
+    private Long actorUserId;
+
+    @Column(name = "actor_email", length = 254, updatable = false)
+    private String actorEmail;
+
     @Column(nullable = false, length = 500)
     private String message;
 

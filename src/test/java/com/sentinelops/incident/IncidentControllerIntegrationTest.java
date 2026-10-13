@@ -34,6 +34,8 @@ class IncidentControllerIntegrationTest {
     @Autowired TeamRepository teams;
 
     private String adminToken;
+    private long adminUserId;
+    private long adminTeamId;
 
     @BeforeEach
     void bootstrapAdmin() throws Exception {
@@ -52,8 +54,10 @@ class IncidentControllerIntegrationTest {
                 .andExpect(status().isCreated())
                 .andReturn();
 
-        adminToken = objectMapper.readTree(
-                result.getResponse().getContentAsString()).get("accessToken").asText();
+        var bootstrap = objectMapper.readTree(result.getResponse().getContentAsString());
+        adminToken = bootstrap.get("accessToken").asText();
+        adminUserId = bootstrap.get("user").get("id").asLong();
+        adminTeamId = bootstrap.get("user").get("teamId").asLong();
     }
 
     @Test
@@ -94,7 +98,71 @@ class IncidentControllerIntegrationTest {
         mockMvc.perform(authorized(get("/api/v1/incidents/{id}/history", incidentId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].toStatus").value("OPEN"))
-                .andExpect(jsonPath("$[1].toStatus").value("ACKNOWLEDGED"));
+                .andExpect(jsonPath("$[1].toStatus").value("ACKNOWLEDGED"))
+                .andExpect(jsonPath("$[0].actorUserId").value(adminUserId))
+                .andExpect(jsonPath("$[0].actorEmail").value("incident-admin@example.com"))
+                .andExpect(jsonPath("$[1].actorUserId").value(adminUserId));
+    }
+
+    @Test
+    void recordsAuthenticatedResponderSeparatelyFromIncidentCreator() throws Exception {
+        var service = serviceRepository.save(ServiceRecord.builder()
+                .name("incident-actor-" + System.nanoTime())
+                .ownerTeam("platform").status(ServiceStatus.ACTIVE).build());
+
+        var created = mockMvc.perform(authorized(post("/api/v1/incidents"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "title", "Actor attribution regression",
+                                "severity", "SEV2",
+                                "serviceId", service.getId()
+                        ))))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long incidentId = objectMapper.readTree(
+                created.getResponse().getContentAsString()).get("id").asLong();
+
+        var newUser = mockMvc.perform(authorized(post("/api/v1/users"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "email", "incident-responder@example.com",
+                                "displayName", "On-call Responder",
+                                "password", "incident-responder-password",
+                                "role", "RESPONDER",
+                                "teamId", adminTeamId
+                        ))))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long responderId = objectMapper.readTree(
+                newUser.getResponse().getContentAsString()).get("id").asLong();
+
+        var login = mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "email", "incident-responder@example.com",
+                                "password", "incident-responder-password"
+                        ))))
+                .andExpect(status().isOk())
+                .andReturn();
+        String responderToken = objectMapper.readTree(
+                login.getResponse().getContentAsString()).get("accessToken").asText();
+
+        mockMvc.perform(patch("/api/v1/incidents/{id}/status", incidentId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + responderToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "status", "ACKNOWLEDGED",
+                                "message", "Responder took ownership"
+                        ))))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(authorized(get("/api/v1/incidents/{id}/history", incidentId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].actorUserId").value(adminUserId))
+                .andExpect(jsonPath("$[0].actorEmail").value("incident-admin@example.com"))
+                .andExpect(jsonPath("$[1].actorUserId").value(responderId))
+                .andExpect(jsonPath("$[1].actorEmail").value("incident-responder@example.com"));
     }
 
     @Test

@@ -1,6 +1,10 @@
 package com.sentinelops.incident;
 
 import com.sentinelops.common.NotFoundException;
+import com.sentinelops.common.UnauthorizedException;
+import com.sentinelops.identity.UserAccountRepository;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import com.sentinelops.service.ServiceRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -17,12 +21,16 @@ public class IncidentService {
     private final IncidentRepository incidents;
     private final IncidentAuditEventRepository audit;
     private final ServiceRepository services;
+    private final UserAccountRepository users;
 
     @Transactional
     public IncidentDtos.IncidentResponse create(IncidentDtos.CreateIncidentRequest request) {
         var target = services.findById(request.serviceId()).orElseThrow(() -> new NotFoundException("Service not found: " + request.serviceId()));
         var incident = incidents.save(Incident.builder().title(request.title().trim()).description(request.description()).severity(request.severity()).status(IncidentStatus.OPEN).service(target).build());
-        audit.save(IncidentAuditEvent.builder().incidentId(incident.getId()).toStatus(IncidentStatus.OPEN).message("Incident created").build());
+        var actor = currentActor();
+        audit.save(IncidentAuditEvent.builder().incidentId(incident.getId())
+                .actorUserId(actor.userId()).actorEmail(actor.email())
+                .toStatus(IncidentStatus.OPEN).message("Incident created").build());
         return IncidentDtos.IncidentResponse.from(incident);
     }
 
@@ -47,9 +55,26 @@ public class IncidentService {
         incident.setStatus(to);
         if (to == IncidentStatus.RESOLVED) incident.setResolvedAt(Instant.now());
         incident = incidents.save(incident);
-        audit.save(IncidentAuditEvent.builder().incidentId(incident.getId()).fromStatus(from).toStatus(to).message(request.message().trim()).build());
+        var actor = currentActor();
+        audit.save(IncidentAuditEvent.builder().incidentId(incident.getId())
+                .actorUserId(actor.userId()).actorEmail(actor.email())
+                .fromStatus(from).toStatus(to).message(request.message().trim()).build());
         return IncidentDtos.IncidentResponse.from(incident);
     }
+
+    private AuditActor currentActor() {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()
+                || auth instanceof AnonymousAuthenticationToken) {
+            // Direct service calls and historical system events have no human actor.
+            return new AuditActor(null, null);
+        }
+        return users.findByEmailIgnoreCase(auth.getName())
+                .map(user -> new AuditActor(user.getId(), user.getEmail()))
+                .orElseThrow(() -> new UnauthorizedException("Authenticated user is unavailable"));
+    }
+
+    private record AuditActor(Long userId, String email) {}
 
     private boolean allowed(IncidentStatus from, IncidentStatus to) {
         return switch (from) {

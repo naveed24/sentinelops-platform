@@ -31,10 +31,12 @@ public final class IncidentDtos {
     }
 
     public record AuditResponse(Long id, IncidentStatus fromStatus, IncidentStatus toStatus,
-                                String message, Instant createdAt) {
+                                String message, Instant createdAt,
+                                Long actorUserId, String actorEmail) {
         static AuditResponse from(IncidentAuditEvent event) {
             return new AuditResponse(event.getId(), event.getFromStatus(), event.getToStatus(),
-                    event.getMessage(), event.getCreatedAt());
+                    event.getMessage(), event.getCreatedAt(),
+                    event.getActorUserId(), event.getActorEmail());
         }
     }
 }
