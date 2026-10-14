@@ -76,7 +76,7 @@ public class IncidentService {
 
     private record AuditActor(Long userId, String email) {}
 
-    private boolean allowed(IncidentStatus from, IncidentStatus to) {
+    static boolean allowed(IncidentStatus from, IncidentStatus to) {
         return switch (from) {
             case OPEN -> to == IncidentStatus.ACKNOWLEDGED || to == IncidentStatus.MITIGATED;
             case ACKNOWLEDGED -> to == IncidentStatus.MITIGATED;
