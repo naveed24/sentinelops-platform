@@ -198,6 +198,70 @@ class IncidentControllerIntegrationTest {
     }
 
     @Test
+    void staleVersionCannotOverwriteIncidentOrAppendAuditEvent() throws Exception {
+        var service = serviceRepository.save(ServiceRecord.builder()
+                .name("incident-stale-version-" + System.nanoTime())
+                .ownerTeam("platform").status(ServiceStatus.ACTIVE).build());
+
+        var created = mockMvc.perform(authorized(post("/api/v1/incidents"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "title", "Concurrent status update",
+                                "severity", "SEV2",
+                                "serviceId", service.getId()
+                        ))))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        var body = objectMapper.readTree(created.getResponse().getContentAsString());
+        long id = body.get("id").asLong();
+        long version = body.get("version").asLong();
+
+        mockMvc.perform(authorized(patch("/api/v1/incidents/{id}/status", id))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "status", "ACKNOWLEDGED",
+                                "message", "Operator A acknowledged",
+                                "expectedVersion", version
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACKNOWLEDGED"))
+                .andExpect(jsonPath("$.version").value(version + 1));
+
+        mockMvc.perform(authorized(patch("/api/v1/incidents/{id}/status", id))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "status", "MITIGATED",
+                                "message", "Stale operator B",
+                                "expectedVersion", version
+                        ))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value(
+                        "Incident was modified; fetch the latest version and retry"));
+
+        mockMvc.perform(authorized(get("/api/v1/incidents/{id}", id)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACKNOWLEDGED"))
+                .andExpect(jsonPath("$.version").value(version + 1));
+
+        mockMvc.perform(authorized(get("/api/v1/incidents/{id}/history", id)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
+    }
+
+    @Test
+    void negativeTransitionVersionIsRejectedByValidation() throws Exception {
+        mockMvc.perform(authorized(patch("/api/v1/incidents/1/status"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "status", "ACKNOWLEDGED",
+                                "message", "Invalid precondition",
+                                "expectedVersion", -1
+                        ))))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void filtersIncidentsByStatusSeverityAndService() throws Exception {
         var service = serviceRepository.save(ServiceRecord.builder()
                 .name("incident-filter-service")
