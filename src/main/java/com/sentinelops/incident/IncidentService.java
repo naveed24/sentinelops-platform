@@ -1,6 +1,7 @@
 package com.sentinelops.incident;
 
 import com.sentinelops.common.NotFoundException;
+import com.sentinelops.common.ConflictException;
 import com.sentinelops.common.UnauthorizedException;
 import com.sentinelops.identity.UserAccountRepository;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
@@ -51,10 +52,16 @@ public class IncidentService {
     @Transactional
     public IncidentDtos.IncidentResponse transition(Long id, IncidentDtos.TransitionRequest request) {
         var incident = find(id); var from = incident.getStatus(); var to = request.status();
+        if (request.expectedVersion() != null
+                && !request.expectedVersion().equals(incident.getVersion())) {
+            throw new ConflictException("Incident was modified; fetch the latest version and retry");
+        }
         if (!allowed(from, to)) throw new IllegalArgumentException("Invalid incident transition: " + from + " -> " + to);
         incident.setStatus(to);
         if (to == IncidentStatus.RESOLVED) incident.setResolvedAt(Instant.now());
-        incident = incidents.save(incident);
+        // Flush optimistic-lock updates before writing an audit event.
+        // A concurrent winner must not produce an audit record for this loser.
+        incident = incidents.saveAndFlush(incident);
         var actor = currentActor();
         audit.save(IncidentAuditEvent.builder().incidentId(incident.getId())
                 .actorUserId(actor.userId()).actorEmail(actor.email())

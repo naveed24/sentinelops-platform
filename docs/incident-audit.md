@@ -12,3 +12,13 @@ Incident creation and accepted status transitions now snapshot the authenticated
 The two columns are nullable for existing rows and internal/service-originated operations that execute outside an HTTP authentication context; those events report `null` for both fields. The migration deliberately does not add a cascading user foreign key so historical audit records survive account changes or removal. Production endpoints still require an authenticated user under the Spring Security rules.
 
 Actor attribution is not an authorization substitute or an immutable forensic ledger. In particular, direct access to the underlying database must be controlled and separately audited.
+
+## Concurrent status transitions
+
+For operator-facing status updates, send `expectedVersion` from the latest incident GET response along with the target status and message:
+
+```json
+{"status":"ACKNOWLEDGED","message":"On-call accepted","expectedVersion":0}
+```
+
+If another responder changes the incident first, the stale operation returns **HTTP 409 Conflict** with a fetch-and-retry message. A rejected operation does not append an audit event. The server also flushes Hibernate's optimistic-lock update before inserting the audit event so concurrent writers cannot record a losing transition. Legacy clients may omit `expectedVersion`, but providing it is recommended for user-driven updates; database optimistic locking still protects physically concurrent writes.
