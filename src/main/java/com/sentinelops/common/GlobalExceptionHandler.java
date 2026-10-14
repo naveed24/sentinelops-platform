@@ -1,6 +1,7 @@
 package com.sentinelops.common;
 
 import org.springframework.http.*;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,6 +21,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ConflictException.class)
     ResponseEntity<ApiError> conflict(ConflictException ex) {
         return build(HttpStatus.CONFLICT, ex.getMessage(), Map.of());
+    }
+
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    ResponseEntity<ApiError> optimisticConflict(ObjectOptimisticLockingFailureException ex) {
+        return build(HttpStatus.CONFLICT,
+                "Incident or related data was modified; fetch the latest version and retry",
+                Map.of());
     }
 
     @ExceptionHandler(UnauthorizedException.class)
