@@ -17,7 +17,14 @@ public final class IncidentDtos {
 
     public record TransitionRequest(
             @NotNull IncidentStatus status,
-            @NotBlank @Size(max = 500) String message) {}
+            @NotBlank @Size(max = 500) String message,
+            @jakarta.validation.constraints.PositiveOrZero Long expectedVersion) {
+        // Direct internal callers remain source compatible; HTTP callers may
+        // supply expectedVersion to protect against stale operator actions.
+        public TransitionRequest(IncidentStatus status, String message) {
+            this(status, message, null);
+        }
+    }
 
     public record IncidentResponse(
             Long id, String title, String description, IncidentSeverity severity,
