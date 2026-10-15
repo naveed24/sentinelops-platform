@@ -5,6 +5,7 @@ import com.sentinelops.service.ServiceRepository;
 import com.sentinelops.service.ServiceStatus;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -34,7 +35,7 @@ class IncidentAuditOrderingIntegrationTest {
                 .toStatus(IncidentStatus.MITIGATED).message("second")
                 .createdAt(timestamp).build());
 
-        var ids = audit.findByIncidentIdOrderByCreatedAtAsc(incidentId).stream()
+        var ids = audit.findByIncidentIdOrderByCreatedAtAsc(incidentId, PageRequest.of(0, 100)).stream()
                 .filter(event -> timestamp.equals(event.getCreatedAt()))
                 .map(IncidentAuditEvent::getId).toList();
         assertThat(ids).containsExactly(first.getId(), second.getId());

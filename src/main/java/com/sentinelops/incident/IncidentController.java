@@ -34,8 +34,11 @@ public class IncidentController {
     }
 
     @GetMapping("/{id}/history")
-    public List<IncidentDtos.AuditResponse> history(@PathVariable Long id) {
-        return incidentService.history(id);
+    public List<IncidentDtos.AuditResponse> history(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "100") int size) {
+        return incidentService.history(id, page, size);
     }
 
     @PatchMapping("/{id}/status")

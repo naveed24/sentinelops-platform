@@ -1,5 +1,6 @@
 package com.sentinelops.incident;
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -11,5 +12,5 @@ public interface IncidentAuditEventRepository extends JpaRepository<IncidentAudi
     @Query("select e from IncidentAuditEvent e where e.incidentId = :incidentId " +
            "order by e.createdAt asc, e.id asc")
     List<IncidentAuditEvent> findByIncidentIdOrderByCreatedAtAsc(
-            @Param("incidentId") Long incidentId);
+            @Param("incidentId") Long incidentId, Pageable pageable);
 }

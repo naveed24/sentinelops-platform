@@ -44,9 +44,12 @@ public class IncidentService {
         return incidents.findAll(specification, page).stream().map(IncidentDtos.IncidentResponse::from).toList();
     }
 
-    public List<IncidentDtos.AuditResponse> history(Long id) {
+    public List<IncidentDtos.AuditResponse> history(Long id, int page, int size) {
+        if (page < 0) throw new IllegalArgumentException("page must be non-negative");
+        if (size < 1 || size > 200) throw new IllegalArgumentException("size must be between 1 and 200");
         find(id);
-        return audit.findByIncidentIdOrderByCreatedAtAsc(id).stream().map(IncidentDtos.AuditResponse::from).toList();
+        return audit.findByIncidentIdOrderByCreatedAtAsc(id, PageRequest.of(page, size))
+                .stream().map(IncidentDtos.AuditResponse::from).toList();
     }
 
     @Transactional

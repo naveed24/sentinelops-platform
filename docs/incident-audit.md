@@ -22,3 +22,15 @@ For operator-facing status updates, send `expectedVersion` from the latest incid
 ```
 
 If another responder changes the incident first, the stale operation returns **HTTP 409 Conflict** with a fetch-and-retry message. A rejected operation does not append an audit event. The server also flushes Hibernate's optimistic-lock update before inserting the audit event so concurrent writers cannot record a losing transition. Legacy clients may omit `expectedVersion`, but providing it is recommended for user-driven updates; database optimistic locking still protects physically concurrent writes.
+
+## Bounded history pages
+
+`GET /api/v1/incidents/{id}/history?page=0&size=100` returns audit events in
+chronological order, using event ID to break timestamp ties. Both parameters are optional:
+`page` defaults to 0 and `size` defaults to 100. The maximum page size is 200.
+Invalid page or size values return HTTP 400. The response remains a JSON array;
+request subsequent pages until an empty or shorter-than-`size` page is returned.
+
+Pagination bounds database work per request, but offset-based pages can shift when new
+events arrive while a client is walking the timeline. Consumers that require a consistent
+forensic snapshot should perform a separate export with an appropriate isolation policy.

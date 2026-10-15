@@ -311,6 +311,58 @@ class IncidentControllerIntegrationTest {
                 .andExpect(jsonPath("$[0].serviceId").value(service.getId()));
     }
 
+    @Test
+    void historyIsPaginatedWithDeterministicOrderAndValidatedBounds() throws Exception {
+        var service = serviceRepository.save(ServiceRecord.builder()
+                .name("incident-history-page-" + System.nanoTime())
+                .ownerTeam("platform").status(ServiceStatus.ACTIVE).build());
+        var created = mockMvc.perform(authorized(post("/api/v1/incidents"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "title", "Bounded history regression",
+                                "severity", "SEV2",
+                                "serviceId", service.getId()))))
+                .andExpect(status().isCreated()).andReturn();
+        long id = objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asLong();
+
+        for (String nextStatus : new String[]{"ACKNOWLEDGED", "MITIGATED"}) {
+            mockMvc.perform(authorized(patch("/api/v1/incidents/{id}/status", id))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(Map.of(
+                                    "status", nextStatus,
+                                    "message", "Advance to " + nextStatus))))
+                    .andExpect(status().isOk());
+        }
+
+        mockMvc.perform(authorized(get("/api/v1/incidents/{id}/history", id))
+                        .param("page", "0").param("size", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].toStatus").value("OPEN"))
+                .andExpect(jsonPath("$[1].toStatus").value("ACKNOWLEDGED"));
+
+        mockMvc.perform(authorized(get("/api/v1/incidents/{id}/history", id))
+                        .param("page", "1").param("size", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].toStatus").value("MITIGATED"));
+
+        mockMvc.perform(authorized(get("/api/v1/incidents/{id}/history", id))
+                        .param("page", "2").param("size", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+
+        for (String[] invalid : new String[][]{{"-1", "10"}, {"0", "0"}, {"0", "201"}}) {
+            mockMvc.perform(authorized(get("/api/v1/incidents/{id}/history", id))
+                            .param("page", invalid[0]).param("size", invalid[1]))
+                    .andExpect(status().isBadRequest());
+        }
+
+        mockMvc.perform(authorized(get("/api/v1/incidents/{id}/history", -1))
+                        .param("page", "0").param("size", "10"))
+                .andExpect(status().isNotFound());
+    }
+
     private MockHttpServletRequestBuilder authorized(MockHttpServletRequestBuilder request) {
         return request.header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken);
     }
