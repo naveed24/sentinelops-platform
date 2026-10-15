@@ -31,7 +31,7 @@ class IncidentServiceIntegrationTest {
                 new IncidentDtos.TransitionRequest(IncidentStatus.RESOLVED, "Recovered"));
 
         assertThat(resolved.resolvedAt()).isNotNull();
-        assertThat(incidentService.history(created.id()))
+        assertThat(incidentService.history(created.id(), 0, 100))
                 .extracting(IncidentDtos.AuditResponse::toStatus)
                 .containsExactly(IncidentStatus.OPEN, IncidentStatus.ACKNOWLEDGED,
                         IncidentStatus.MITIGATED, IncidentStatus.RESOLVED);
@@ -48,6 +48,6 @@ class IncidentServiceIntegrationTest {
                 new IncidentDtos.TransitionRequest(IncidentStatus.RESOLVED, "Invalid jump")))
                 .isInstanceOf(IllegalArgumentException.class);
 
-        assertThat(incidentService.history(created.id())).hasSize(1);
+        assertThat(incidentService.history(created.id(), 0, 100)).hasSize(1);
     }
 }
