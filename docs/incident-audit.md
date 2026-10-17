@@ -34,3 +34,17 @@ request subsequent pages until an empty or shorter-than-`size` page is returned.
 Pagination bounds database work per request, but offset-based pages can shift when new
 events arrive while a client is walking the timeline. Consumers that require a consistent
 forensic snapshot should perform a separate export with an appropriate isolation policy.
+
+## Bounded incident search pages
+
+`GET /api/v1/incidents?page=0&limit=100` returns incidents newest first, with
+incident ID as a stable tie-breaker for identical creation timestamps. `page`
+defaults to 0, and `limit` defaults to 100 (maximum 200). The existing
+`status`, `severity`, and `serviceId` filters apply **before** pagination.
+Clients can request successive zero-based pages until a page contains fewer
+than `limit` items. The response stays a JSON array for backwards compatibility.
+
+Negative pages, limits outside 1–200, and page offsets exceeding the database
+integer offset range return HTTP 400. These offset pages do not provide a
+snapshot across concurrent incident inserts; for consistent exports, use a
+separate snapshot-based workflow.

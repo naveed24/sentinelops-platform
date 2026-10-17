@@ -37,11 +37,13 @@ public class IncidentService {
 
     public IncidentDtos.IncidentResponse get(Long id) { return IncidentDtos.IncidentResponse.from(find(id)); }
 
-    public List<IncidentDtos.IncidentResponse> list(IncidentStatus status, IncidentSeverity severity, Long serviceId, int limit) {
+    public List<IncidentDtos.IncidentResponse> list(IncidentStatus status, IncidentSeverity severity, Long serviceId, int page, int limit) {
+        if (page < 0) throw new IllegalArgumentException("page must be non-negative");
         if (limit < 1 || limit > 200) throw new IllegalArgumentException("limit must be between 1 and 200");
+        if ((long) page * limit > Integer.MAX_VALUE) throw new IllegalArgumentException("page offset is too large");
         var specification = IncidentSpecifications.hasStatus(status).and(IncidentSpecifications.hasSeverity(severity)).and(IncidentSpecifications.belongsToService(serviceId));
-        var page = PageRequest.of(0, limit, Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by(Sort.Direction.DESC, "id")));
-        return incidents.findAll(specification, page).stream().map(IncidentDtos.IncidentResponse::from).toList();
+        var pageable = PageRequest.of(page, limit, Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by(Sort.Direction.DESC, "id")));
+        return incidents.findAll(specification, pageable).stream().map(IncidentDtos.IncidentResponse::from).toList();
     }
 
     public List<IncidentDtos.AuditResponse> history(Long id, int page, int size) {
