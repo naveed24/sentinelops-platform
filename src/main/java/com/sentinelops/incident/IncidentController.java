@@ -24,8 +24,9 @@ public class IncidentController {
             @RequestParam(required = false) IncidentStatus status,
             @RequestParam(required = false) IncidentSeverity severity,
             @RequestParam(required = false) Long serviceId,
+            @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "100") int limit) {
-        return incidentService.list(status, severity, serviceId, limit);
+        return incidentService.list(status, severity, serviceId, page, limit);
     }
 
     @GetMapping("/{id}")
