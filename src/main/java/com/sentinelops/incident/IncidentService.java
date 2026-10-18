@@ -4,6 +4,7 @@ import com.sentinelops.common.NotFoundException;
 import com.sentinelops.common.ConflictException;
 import com.sentinelops.common.UnauthorizedException;
 import com.sentinelops.identity.UserAccountRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import com.sentinelops.service.ServiceRepository;
@@ -23,6 +24,7 @@ public class IncidentService {
     private final IncidentAuditEventRepository audit;
     private final ServiceRepository services;
     private final UserAccountRepository users;
+    private final ApplicationEventPublisher events;
 
     @Transactional
     public IncidentDtos.IncidentResponse create(IncidentDtos.CreateIncidentRequest request) {
@@ -32,6 +34,7 @@ public class IncidentService {
         audit.save(IncidentAuditEvent.builder().incidentId(incident.getId())
                 .actorUserId(actor.userId()).actorEmail(actor.email())
                 .toStatus(IncidentStatus.OPEN).message("Incident created").build());
+        events.publishEvent(new IncidentLifecycleEvent(incident.getSeverity(), null, IncidentStatus.OPEN));
         return IncidentDtos.IncidentResponse.from(incident);
     }
 
@@ -71,6 +74,7 @@ public class IncidentService {
         audit.save(IncidentAuditEvent.builder().incidentId(incident.getId())
                 .actorUserId(actor.userId()).actorEmail(actor.email())
                 .fromStatus(from).toStatus(to).message(request.message().trim()).build());
+        events.publishEvent(new IncidentLifecycleEvent(incident.getSeverity(), from, to));
         return IncidentDtos.IncidentResponse.from(incident);
     }
 
