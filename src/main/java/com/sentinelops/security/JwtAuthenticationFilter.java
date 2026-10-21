@@ -15,6 +15,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Objects;
 
 @Component
 @RequiredArgsConstructor
@@ -29,48 +30,64 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             HttpServletResponse response,
             FilterChain filterChain) throws ServletException, IOException {
 
-        String authorization = request.getHeader("Authorization");
+        var headers = request.getHeaders("Authorization");
+        if (headers == null || !headers.hasMoreElements()) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        String authorization = headers.nextElement();
+        if (headers.hasMoreElements()) {
+            reject(response, "Multiple Authorization headers are not allowed");
+            return;
+        }
+
         if (authorization == null || authorization.isBlank()) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        if (!authorization.startsWith("Bearer ")) {
-            response.sendError(HttpServletResponse.SC_UNAUTHORIZED,
-                    "Authorization header must use Bearer authentication");
+        // HTTP authentication schemes are case-insensitive (RFC 7235).
+        if (!authorization.regionMatches(true, 0, "Bearer ", 0, 7)) {
+            reject(response, "Authorization header must use Bearer authentication");
             return;
         }
 
         String token = authorization.substring(7).trim();
         if (token.isEmpty()) {
-            response.sendError(HttpServletResponse.SC_UNAUTHORIZED,
-                    "Access token is missing");
+            reject(response, "Access token is missing");
             return;
         }
 
+        JwtService.TokenClaims claims;
         try {
-            JwtService.TokenClaims claims = jwtService.parseAndValidate(token);
-
-            var user = users.findByEmailIgnoreCase(claims.subject())
-                    .orElseThrow(() -> new IllegalArgumentException("Unknown token subject"));
-
-            if (!user.getId().equals(claims.userId())
-                    || user.getStatus() != UserStatus.ACTIVE
-                    || user.getRole() != claims.role()) {
-                throw new IllegalArgumentException(
-                        "Token no longer matches the active user account");
-            }
-
-            var authority = new SimpleGrantedAuthority("ROLE_" + user.getRole().name());
-            var authentication = new UsernamePasswordAuthenticationToken(
-                    user.getEmail(), null, List.of(authority));
-
-            SecurityContextHolder.getContext().setAuthentication(authentication);
-            filterChain.doFilter(request, response);
-        } catch (RuntimeException ex) {
-            SecurityContextHolder.clearContext();
-            response.sendError(HttpServletResponse.SC_UNAUTHORIZED,
-                    "Invalid or expired access token");
+            claims = jwtService.parseAndValidate(token);
+        } catch (IllegalArgumentException ex) {
+            reject(response, "Invalid or expired access token");
+            return;
         }
+
+        // Do not catch database or downstream application exceptions here.
+        // They are operational failures, not authentication failures.
+        var user = users.findByEmailIgnoreCase(claims.subject()).orElse(null);
+        if (user == null
+                || !Objects.equals(user.getId(), claims.userId())
+                || user.getStatus() != UserStatus.ACTIVE
+                || user.getRole() != claims.role()) {
+            reject(response, "Invalid or expired access token");
+            return;
+        }
+
+        var authority = new SimpleGrantedAuthority("ROLE_" + user.getRole().name());
+        var authentication = new UsernamePasswordAuthenticationToken(
+                user.getEmail(), null, List.of(authority));
+
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+        filterChain.doFilter(request, response);
+    }
+
+    private void reject(HttpServletResponse response, String message) throws IOException {
+        SecurityContextHolder.clearContext();
+        response.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
     }
 }
