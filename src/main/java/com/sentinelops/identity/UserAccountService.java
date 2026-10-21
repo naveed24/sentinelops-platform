@@ -51,16 +51,36 @@ public class UserAccountService {
 
     @Transactional
     public IdentityDtos.UserResponse updateRole(Long id, IdentityDtos.UpdateRoleRequest request) {
+        int activeAdminCount = lockActiveAdmins();
         UserAccount user = find(id);
+        protectLastActiveAdmin(user, request.role(), user.getStatus(), activeAdminCount);
         user.setRole(request.role());
         return IdentityDtos.UserResponse.from(users.saveAndFlush(user));
     }
 
     @Transactional
     public IdentityDtos.UserResponse updateStatus(Long id, IdentityDtos.UpdateStatusRequest request) {
+        int activeAdminCount = lockActiveAdmins();
         UserAccount user = find(id);
+        protectLastActiveAdmin(user, user.getRole(), request.status(), activeAdminCount);
         user.setStatus(request.status());
         return IdentityDtos.UserResponse.from(users.saveAndFlush(user));
+    }
+
+    private int lockActiveAdmins() {
+        // Lock all active administrators in ID order before loading the target.
+        // Concurrent demotions/deactivations cannot both pass a stale count check.
+        return users.lockUsersByRoleAndStatus(UserRole.ADMIN, UserStatus.ACTIVE).size();
+    }
+
+    private void protectLastActiveAdmin(
+            UserAccount current, UserRole newRole, UserStatus newStatus, int activeAdminCount) {
+        boolean removingAccess = current.getRole() == UserRole.ADMIN
+                && current.getStatus() == UserStatus.ACTIVE
+                && (newRole != UserRole.ADMIN || newStatus != UserStatus.ACTIVE);
+        if (removingAccess && activeAdminCount <= 1) {
+            throw new ConflictException("Cannot remove the last active administrator");
+        }
     }
 
     private UserAccount find(Long id) {
