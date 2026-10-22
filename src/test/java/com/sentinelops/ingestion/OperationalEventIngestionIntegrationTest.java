@@ -16,7 +16,6 @@ import static org.assertj.core.api.Assertions.*;
 @ActiveProfiles("test")
 class OperationalEventIngestionIntegrationTest {
     @Autowired OperationalEventIngestionService ingestion;
-    @Autowired OperationalEventConsumer consumer;
     @Autowired OperationalEventRepository events;
     @Autowired ServiceRepository services;
 
@@ -42,7 +41,7 @@ class OperationalEventIngestionIntegrationTest {
                 .name("ingestion-checkout").ownerTeam("platform")
                 .status(ServiceStatus.ACTIVE).build());
         UUID id = UUID.randomUUID();
-        consumer.consume(validPayload(id, service.getId()));
+        new OperationalEventConsumer(ingestion).consume(validPayload(id, service.getId()));
         assertThat(events.existsById(id.toString())).isTrue();
     }
 
