@@ -10,7 +10,7 @@ SentinelOps is a production-style incident and observability platform built to m
 - Spring Data JPA + PostgreSQL
 - Flyway migrations
 - Redis (prepared for caching/rate limiting)
-- Kafka (planned event pipeline)
+- Kafka (versioned operational-event ingestion with durable inbox and dead-letter handling)
 - Micrometer + Prometheus
 - Docker / Docker Compose
 - React dashboard (planned)
@@ -75,5 +75,7 @@ curl http://localhost:8080/api/v1/services
 5. Alert rules, notification abstraction and scheduled evaluation
 6. React operations dashboard
 7. CI, hardening, security/config cleanup, sample data and final documentation
+
+Kafka ingestion is opt-in. See [docs/kafka-ingestion.md](docs/kafka-ingestion.md) for setup, event schema, idempotency and dead-letter handling.
 
 See [docs/architecture.md](docs/architecture.md) for the evolving system design.
