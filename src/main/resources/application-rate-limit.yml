@@ -1,0 +1,6 @@
+# Enable explicitly with SPRING_PROFILES_ACTIVE=rate-limit (combine profiles with commas).
+# Redis connection settings are shared with application.yml.
+sentinelops:
+  rate-limit:
+    max-requests: ${AUTH_RATE_LIMIT_MAX_REQUESTS:10}
+    window-seconds: ${AUTH_RATE_LIMIT_WINDOW_SECONDS:60}
