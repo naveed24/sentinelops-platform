@@ -1,6 +1,7 @@
 package com.sentinelops.ingestion;
 
 import com.sentinelops.service.ServiceRepository;
+import com.sentinelops.alert.AlertOccurrenceEvaluator;
 import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,7 @@ public class OperationalEventIngestionService {
 
     private final OperationalEventRepository events;
     private final ServiceRepository services;
+    private final AlertOccurrenceEvaluator alertEvaluator;
     private final ObjectMapper objectMapper;
     private final Validator validator;
 
@@ -37,7 +39,7 @@ public class OperationalEventIngestionService {
         // A unique event_id PK is the final guard against concurrent redelivery.
         // If a concurrent insert wins, the Kafka error handler retries and the
         // next attempt observes the committed event as a duplicate.
-        events.saveAndFlush(OperationalEvent.builder()
+        var stored = events.saveAndFlush(OperationalEvent.builder()
                 .eventId(eventId)
                 .service(service)
                 .source(message.source())
@@ -45,6 +47,9 @@ public class OperationalEventIngestionService {
                 .message(message.message())
                 .occurredAt(message.occurredAt())
                 .build());
+        // Match rules within the same transaction as inbox persistence.
+        // A listener retry cannot commit an event without its alert occurrences.
+        alertEvaluator.evaluate(stored);
         return true;
     }
 
