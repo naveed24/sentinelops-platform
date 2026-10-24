@@ -78,4 +78,6 @@ curl http://localhost:8080/api/v1/services
 
 Kafka ingestion is opt-in. See [docs/kafka-ingestion.md](docs/kafka-ingestion.md) for setup, event schema, idempotency and dead-letter handling.
 
+Alert rule management is available to authenticated operators. See [docs/alert-rules.md](docs/alert-rules.md) for API contracts, permissions and planned evaluation behavior.
+
 See [docs/architecture.md](docs/architecture.md) for the evolving system design.
