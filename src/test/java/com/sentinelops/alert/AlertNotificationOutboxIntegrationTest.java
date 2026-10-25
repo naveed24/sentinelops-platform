@@ -38,7 +38,11 @@ class AlertNotificationOutboxIntegrationTest {
         assertThat(occurrences.countByEvent_EventId(second.toString())).isEqualTo(1);
         assertThat(notifications.countByRule_Id(rule.getId())).isEqualTo(1);
         var queued = notifications.findFirstByRule_IdOrderByCreatedAtDescIdDesc(rule.getId()).orElseThrow();
-        assertThat(queued.getOccurrence().getEvent().getEventId()).isEqualTo(first.toString());
+        // Assert by foreign-key identity without dereferencing a detached LAZY proxy.
+        var firstOccurrence = occurrences.findAll().stream()
+                .filter(o -> o.getEvent().getEventId().equals(first.toString()))
+                .findFirst().orElseThrow();
+        assertThat(queued.getOccurrence().getId()).isEqualTo(firstOccurrence.getId());
         assertThat(queued.getStatus()).isEqualTo(AlertNotificationStatus.PENDING);
         assertThat(queued.getAttemptCount()).isZero();
         assertThat(queued.getNextAttemptAt()).isEqualTo(queued.getCreatedAt());
