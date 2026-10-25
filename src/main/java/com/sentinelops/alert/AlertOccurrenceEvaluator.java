@@ -6,26 +6,46 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+
 /**
- * Evaluates exact service/type matches for an event in the ingestion transaction.
- * Persisted occurrences are snapshots of severity at matching time.
- * Cooldown/delivery are deliberately not applied here: a later delivery
- * worker may coalesce occurrences without erasing the audit trail.
+ * Writes immutable alert occurrences and cooldown-aware delivery intents in
+ * the same transaction as the Kafka inbox. A rule row lock serializes
+ * competing events for that rule, preventing duplicate cooldown notifications.
  */
 @Service
 @RequiredArgsConstructor
 public class AlertOccurrenceEvaluator {
     private final AlertRuleRepository rules;
     private final AlertOccurrenceRepository occurrences;
+    private final AlertNotificationOutboxRepository notifications;
 
     @Transactional(propagation = Propagation.MANDATORY)
     public void evaluate(OperationalEvent event) {
-        for (AlertRule rule : rules.findByService_IdAndEnabledTrueAndEventType(
+        // Cooldown uses processing time, not potentially delayed producer timestamps.
+        Instant now = Instant.now();
+        for (AlertRule rule : rules.lockEnabledMatchingRules(
                 event.getService().getId(), event.getEventType())) {
-            occurrences.save(AlertOccurrence.builder()
+            // Always retain every match for audit, even when delivery is suppressed.
+            AlertOccurrence occurrence = occurrences.save(AlertOccurrence.builder()
                     .rule(rule)
                     .event(event)
                     .severity(rule.getSeverity())
+                    .build());
+
+            var last = notifications.findFirstByRule_IdOrderByCreatedAtDescIdDesc(rule.getId());
+            if (last.isPresent() && now.isBefore(
+                    last.get().getCreatedAt().plusSeconds(rule.getCooldownSeconds()))) {
+                continue;
+            }
+
+            notifications.save(AlertNotificationOutbox.builder()
+                    .rule(rule)
+                    .occurrence(occurrence)
+                    .status(AlertNotificationStatus.PENDING)
+                    .attemptCount(0)
+                    .createdAt(now)
+                    .nextAttemptAt(now)
                     .build());
         }
     }
