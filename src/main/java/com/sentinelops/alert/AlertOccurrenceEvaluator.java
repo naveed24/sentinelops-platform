@@ -23,9 +23,12 @@ public class AlertOccurrenceEvaluator {
     @Transactional(propagation = Propagation.MANDATORY)
     public void evaluate(OperationalEvent event) {
         // Cooldown uses processing time, not potentially delayed producer timestamps.
+        var matchingRules = rules.lockEnabledMatchingRules(
+                event.getService().getId(), event.getEventType());
+        // Capture time only after obtaining row locks; a waiting consumer must
+        // not compare a stale pre-lock timestamp to a newer queued intent.
         Instant now = Instant.now();
-        for (AlertRule rule : rules.lockEnabledMatchingRules(
-                event.getService().getId(), event.getEventType())) {
+        for (AlertRule rule : matchingRules) {
             // Always retain every match for audit, even when delivery is suppressed.
             AlertOccurrence occurrence = occurrences.save(AlertOccurrence.builder()
                     .rule(rule)
