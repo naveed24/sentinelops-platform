@@ -6,4 +6,4 @@ The event inbox and all matches are persisted in one database transaction. On fa
 
 A disabled rule, a different service or a different event type cannot match. Updating a rule affects future events only; previous severity snapshots are preserved.
 
-**Boundaries:** This slice creates occurrence records, not user notifications or incidents. `cooldownSeconds` is retained in the rule configuration for the future notification aggregation/delivery worker; it does not discard occurrences. There is no notification delivery in this slice.
+Matching occurrences may also enqueue a durable notification intent, subject to each rule's cooldown. Suppressed notifications **do not** suppress audit occurrences. See [alert notification outbox](alert-notification-outbox.md) for concurrency, cooldown and delivery boundaries.
