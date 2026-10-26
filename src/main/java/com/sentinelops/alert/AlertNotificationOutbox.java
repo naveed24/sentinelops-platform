@@ -35,6 +35,18 @@ public class AlertNotificationOutbox {
     @Column(name = "next_attempt_at", nullable = false)
     private Instant nextAttemptAt;
 
+    @Column(name = "lease_token", length = 36)
+    private String leaseToken;
+
+    @Column(name = "lease_expires_at")
+    private Instant leaseExpiresAt;
+
+    @Column(name = "delivered_at")
+    private Instant deliveredAt;
+
+    @Column(name = "last_error", length = 300)
+    private String lastError;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 }
