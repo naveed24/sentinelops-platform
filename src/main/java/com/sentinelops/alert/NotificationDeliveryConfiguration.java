@@ -5,7 +5,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.scheduling.annotation.EnableScheduling;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Clock;
@@ -16,7 +15,6 @@ import java.time.Duration;
  * configure a real HTTPS endpoint and HMAC secret.
  */
 @Configuration
-@EnableScheduling
 @ConditionalOnProperty(prefix = "sentinelops.notifications.delivery", name = "enabled", havingValue = "true")
 public class NotificationDeliveryConfiguration {
     @Bean

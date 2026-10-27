@@ -77,6 +77,13 @@ public interface AlertNotificationOutboxRepository extends JpaRepository<AlertNo
                     @Param("newStatus") AlertNotificationStatus newStatus,
                     @Param("nextAttempt") Instant nextAttempt,
                     @Param("reason") String reason);
+    /** Bounded result set (one row per enum value) for monitoring without loading entities. */
+    @Query("select n.status, count(n) from AlertNotificationOutbox n group by n.status")
+    List<Object[]> countGroupedByStatus();
+
+    @Query("select min(n.createdAt) from AlertNotificationOutbox n where n.status = :status")
+    Instant oldestCreatedAtForStatus(@Param("status") AlertNotificationStatus status);
+
     long countByRule_Id(Long ruleId);
     boolean existsByOccurrence_Id(Long occurrenceId);
 }
