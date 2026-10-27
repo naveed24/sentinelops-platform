@@ -3,6 +3,7 @@ package com.sentinelops.alert;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -29,6 +30,7 @@ public class NotificationOutboxMetrics {
     private final AtomicLong oldestPendingAgeSeconds = new AtomicLong();
     private final AtomicLong lastSuccessfulSampleEpochSeconds = new AtomicLong();
 
+    @Autowired
     public NotificationOutboxMetrics(AlertNotificationOutboxRepository outbox,
                                      MeterRegistry registry) {
         this(outbox, registry, Clock.systemUTC());
