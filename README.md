@@ -11,7 +11,7 @@ SentinelOps is a production-style incident and observability platform built to m
 - Flyway migrations
 - Redis (prepared for caching/rate limiting)
 - Kafka (versioned operational-event ingestion with durable inbox and dead-letter handling)
-- Micrometer + Prometheus
+- Micrometer + Prometheus + opt-in OpenTelemetry/OTLP tracing
 - Docker / Docker Compose
 - React dashboard (planned)
 - GitHub Actions CI (planned)
@@ -75,6 +75,8 @@ curl http://localhost:8080/api/v1/services
 5. Alert rules, notification abstraction and scheduled evaluation
 6. React operations dashboard
 7. CI, hardening, security/config cleanup, sample data and final documentation
+
+For tracing setup, safe attributes, sampling and exporter configuration see [docs/distributed-tracing.md](docs/distributed-tracing.md).
 
 Kafka ingestion is opt-in. See [docs/kafka-ingestion.md](docs/kafka-ingestion.md) for setup, event schema, idempotency and dead-letter handling.
 

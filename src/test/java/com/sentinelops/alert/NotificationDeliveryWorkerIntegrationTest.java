@@ -6,6 +6,7 @@ import com.sentinelops.service.ServiceRecord;
 import com.sentinelops.service.ServiceRepository;
 import com.sentinelops.service.ServiceStatus;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.micrometer.observation.ObservationRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -123,7 +124,8 @@ class NotificationDeliveryWorkerIntegrationTest {
         var settings = new NotificationDeliveryWorker.Settings(10, maxAttempts,
                 Duration.ofSeconds(60), Duration.ofSeconds(30), Duration.ofMinutes(10));
         return new NotificationDeliveryWorker(claims, completions, port,
-                new SimpleMeterRegistry(), settings, Clock.fixed(now, ZoneOffset.UTC));
+                new SimpleMeterRegistry(), ObservationRegistry.create(),
+                settings, Clock.fixed(now, ZoneOffset.UTC));
     }
 
     private AlertNotificationOutbox queueNotification() {
