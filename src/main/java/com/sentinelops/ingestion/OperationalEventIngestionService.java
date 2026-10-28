@@ -3,6 +3,8 @@ package com.sentinelops.ingestion;
 import com.sentinelops.service.ServiceRepository;
 import com.sentinelops.alert.AlertOccurrenceEvaluator;
 import jakarta.validation.Validator;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,33 +26,48 @@ public class OperationalEventIngestionService {
     private final AlertOccurrenceEvaluator alertEvaluator;
     private final ObjectMapper objectMapper;
     private final Validator validator;
+    private final ObservationRegistry observations;
 
     @Transactional
     public boolean ingest(String payload) {
-        OperationalEventMessage message = parse(payload);
-        String eventId = message.eventId().toString();
-        if (events.existsById(eventId)) {
-            return false;
+        var observation = Observation.createNotStarted("sentinelops.ingestion.event", observations)
+                .contextualName("ingest operational event")
+                .start();
+        try (var scope = observation.openScope()) {
+            OperationalEventMessage message = parse(payload);
+            observation.highCardinalityKeyValue("event.id", message.eventId().toString());
+            observation.highCardinalityKeyValue("service.id", message.serviceId().toString());
+            String eventId = message.eventId().toString();
+            if (events.existsById(eventId)) {
+                observation.lowCardinalityKeyValue("outcome", "duplicate");
+                return false;
+            }
+
+            var service = services.findById(message.serviceId()).orElseThrow(() ->
+                    new InvalidOperationalEventException("Unknown serviceId: " + message.serviceId()));
+
+            // The event inbox and all matching alert occurrences commit together.
+            // A concurrent duplicate insert rolls back and is retried by Kafka.
+            var stored = events.saveAndFlush(OperationalEvent.builder()
+                    .eventId(eventId)
+                    .service(service)
+                    .source(message.source())
+                    .eventType(message.type())
+                    .message(message.message())
+                    .occurredAt(message.occurredAt())
+                    .build());
+            alertEvaluator.evaluate(stored);
+            observation.lowCardinalityKeyValue("outcome", "accepted");
+            return true;
+        } catch (RuntimeException ex) {
+            observation.lowCardinalityKeyValue("outcome",
+                    ex instanceof InvalidOperationalEventException ? "rejected" : "error");
+            // Do not attach exception messages: parser errors may echo raw event data.
+            observation.error(new IllegalStateException("operational_event_processing_failed"));
+            throw ex;
+        } finally {
+            observation.stop();
         }
-
-        var service = services.findById(message.serviceId()).orElseThrow(() ->
-                new InvalidOperationalEventException("Unknown serviceId: " + message.serviceId()));
-
-        // A unique event_id PK is the final guard against concurrent redelivery.
-        // If a concurrent insert wins, the Kafka error handler retries and the
-        // next attempt observes the committed event as a duplicate.
-        var stored = events.saveAndFlush(OperationalEvent.builder()
-                .eventId(eventId)
-                .service(service)
-                .source(message.source())
-                .eventType(message.type())
-                .message(message.message())
-                .occurredAt(message.occurredAt())
-                .build());
-        // Match rules within the same transaction as inbox persistence.
-        // A listener retry cannot commit an event without its alert occurrences.
-        alertEvaluator.evaluate(stored);
-        return true;
     }
 
     private OperationalEventMessage parse(String payload) {

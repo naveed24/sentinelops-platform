@@ -34,5 +34,5 @@ flowchart LR
 - Redis for fast reads, distributed rate limiting and short-lived coordination.
 - Auditable incident state transitions.
 - Secure API access using JWT and role-based authorization.
-- Observable by default through health probes, metrics and structured logging.
+- Observable through health probes, Prometheus metrics, trace-correlated logs and opt-in OTLP traces.
 - Container-first local development and CI-friendly automated tests.

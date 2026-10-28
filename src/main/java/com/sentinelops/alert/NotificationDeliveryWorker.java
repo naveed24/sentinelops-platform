@@ -1,6 +1,8 @@
 package com.sentinelops.alert;
 
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
 import org.springframework.scheduling.annotation.Scheduled;
 
 import java.time.Clock;
@@ -28,17 +30,20 @@ public class NotificationDeliveryWorker {
     private final NotificationOutboxCompletionService completions;
     private final NotificationDeliveryPort provider;
     private final MeterRegistry metrics;
+    private final ObservationRegistry observations;
     private final Settings settings;
     private final Clock clock;
 
     public NotificationDeliveryWorker(NotificationOutboxClaimService claims,
                                       NotificationOutboxCompletionService completions,
                                       NotificationDeliveryPort provider,
-                                      MeterRegistry metrics, Settings settings, Clock clock) {
+                                      MeterRegistry metrics, ObservationRegistry observations,
+                                      Settings settings, Clock clock) {
         this.claims = claims;
         this.completions = completions;
         this.provider = provider;
         this.metrics = metrics;
+        this.observations = observations;
         this.settings = settings;
         this.clock = clock;
     }
@@ -56,11 +61,26 @@ public class NotificationDeliveryWorker {
             if (next.isEmpty()) break;
             var claim = next.orElseThrow();
             attempts++;
+            deliverClaim(claim);
+            if (Thread.currentThread().isInterrupted()) break;
+        }
+        return attempts;
+    }
+
+    private void deliverClaim(NotificationOutboxClaimService.Claim claim) {
+        var observation = Observation.createNotStarted("sentinelops.notification.attempt", observations)
+                .contextualName("deliver notification")
+                .highCardinalityKeyValue("notification.id", Long.toString(claim.id()))
+                .highCardinalityKeyValue("notification.attempt", Integer.toString(claim.attemptCount()))
+                .start();
+        try (var scope = observation.openScope()) {
             try {
                 provider.deliver(claim.payload());
                 if (completions.sent(claim.id(), claim.leaseToken(), clock.instant())) {
+                    observation.lowCardinalityKeyValue("outcome", "sent");
                     metrics.counter("sentinelops.notification.delivery", "result", "sent").increment();
                 } else {
+                    observation.lowCardinalityKeyValue("outcome", "stale");
                     metrics.counter("sentinelops.notification.delivery", "result", "stale").increment();
                 }
             } catch (Exception ex) {
@@ -74,12 +94,19 @@ public class NotificationDeliveryWorker {
                 reason = reason.substring(0, Math.min(300, reason.length()));
                 boolean updated = completions.failed(claim.id(), claim.leaseToken(),
                         terminal, nextAttempt, reason);
-                metrics.counter("sentinelops.notification.delivery", "result",
-                        updated ? (terminal ? "failed" : "retry") : "stale").increment();
-                if (Thread.currentThread().isInterrupted()) break;
+                String outcome = updated ? (terminal ? "failed" : "retry") : "stale";
+                observation.lowCardinalityKeyValue("outcome", outcome);
+                // Trace only a sanitized marker, not webhook URLs, payloads or secrets.
+                observation.error(new IllegalStateException("notification_delivery_failed"));
+                metrics.counter("sentinelops.notification.delivery", "result", outcome).increment();
             }
+        } catch (RuntimeException ex) {
+            observation.lowCardinalityKeyValue("outcome", "error");
+            observation.error(new IllegalStateException("notification_processing_failed"));
+            throw ex;
+        } finally {
+            observation.stop();
         }
-        return attempts;
     }
 
     private Duration retryDelay(int attempt) {

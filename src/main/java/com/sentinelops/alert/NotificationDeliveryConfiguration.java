@@ -1,6 +1,7 @@
 package com.sentinelops.alert;
 
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.observation.ObservationRegistry;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -29,13 +30,13 @@ public class NotificationDeliveryConfiguration {
     @Bean
     NotificationDeliveryWorker notificationDeliveryWorker(
             NotificationOutboxClaimService claims, NotificationOutboxCompletionService completions,
-            NotificationDeliveryPort port, MeterRegistry metrics,
+            NotificationDeliveryPort port, MeterRegistry metrics, ObservationRegistry observations,
             @Value("${sentinelops.notifications.delivery.batch-size:10}") int batchSize,
             @Value("${sentinelops.notifications.delivery.max-attempts:5}") int maxAttempts,
             @Value("${sentinelops.notifications.delivery.lease:PT1M}") Duration lease,
             @Value("${sentinelops.notifications.delivery.retry-base:PT30S}") Duration retryBase,
             @Value("${sentinelops.notifications.delivery.retry-cap:PT1H}") Duration retryCap) {
-        return new NotificationDeliveryWorker(claims, completions, port, metrics,
+        return new NotificationDeliveryWorker(claims, completions, port, metrics, observations,
                 new NotificationDeliveryWorker.Settings(batchSize, maxAttempts, lease,
                         retryBase, retryCap), Clock.systemUTC());
     }
