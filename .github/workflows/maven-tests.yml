@@ -19,3 +19,23 @@ jobs:
           cache: maven
       - name: Run verification
         run: mvn --batch-mode --no-transfer-progress clean verify
+
+  dashboard:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dashboard dependencies
+        run: npm install --no-audit --no-fund
+      - name: Run dashboard tests
+        run: npm test
+      - name: Typecheck and build dashboard
+        run: npm run build
+
