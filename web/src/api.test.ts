@@ -34,7 +34,7 @@ describe('authenticated API client', () => {
   it('serializes filters and paging using the backend contract', async () => {
     expect(incidentQuery({ status: 'OPEN', severity: 'SEV1', serviceId: '42' }, 2, 50))
       .toBe('/api/v1/incidents?page=2&limit=50&status=OPEN&severity=SEV1&serviceId=42');
-    const fetchMock = vi.fn().mockResolvedValue(new Response('[]', { status: 200 }));
+    const fetchMock = vi.fn().mockImplementation(async () => new Response('[]', { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
     await getIncidents('token', { status: '', severity: '', serviceId: '' }, 0, 50);
     await getIncidentHistory('token', 19);
