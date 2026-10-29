@@ -13,8 +13,8 @@ SentinelOps is a production-style incident and observability platform built to m
 - Kafka (versioned operational-event ingestion with durable inbox and dead-letter handling)
 - Micrometer + Prometheus + opt-in OpenTelemetry/OTLP tracing
 - Docker / Docker Compose
-- React dashboard (planned)
-- GitHub Actions CI (planned)
+- React + TypeScript read-only operations dashboard (initial slice)
+- GitHub Actions CI (backend and dashboard)
 
 ## Day 1 scope
 
@@ -80,6 +80,8 @@ For tracing setup, safe attributes, sampling and exporter configuration see [doc
 
 Kafka ingestion is opt-in. See [docs/kafka-ingestion.md](docs/kafka-ingestion.md) for setup, event schema, idempotency and dead-letter handling.
 
-Alert rule management is available to authenticated operators. See [docs/alert-rules.md](docs/alert-rules.md) for API contracts, permissions and planned evaluation behavior.
+Alert rule management, event-driven occurrences, durable notification outbox and delivery worker are available. See [docs/alert-rules.md](docs/alert-rules.md), [docs/alert-notification-outbox.md](docs/alert-notification-outbox.md), and [docs/notification-delivery-worker.md](docs/notification-delivery-worker.md).
 
 See [docs/architecture.md](docs/architecture.md) for the evolving system design.
+
+The first React operations console is available in [web/](web/README.md), with login, service health, incident filtering and audit history. Run `cd web && npm install && npm run dev` after starting the API.
