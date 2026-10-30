@@ -126,3 +126,14 @@ export function getIncidentHistory(
   });
 }
 
+
+/** Optimistic concurrency is required for operator-driven lifecycle transitions. */
+export function transitionIncident(
+  token: string, id: number, status: IncidentStatus, message: string,
+  expectedVersion: number, signal?: AbortSignal
+): Promise<Incident> {
+  return request<Incident>('/api/v1/incidents/' + id + '/status', {
+    token, method: 'PATCH', signal,
+    body: { status, message, expectedVersion }
+  });
+}

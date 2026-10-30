@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, getIncidentHistory, getIncidents, getServices, incidentQuery, login } from './api';
+import { ApiError, getIncidentHistory, getIncidents, getServices, incidentQuery, login, transitionIncident } from './api';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -40,6 +40,33 @@ describe('authenticated API client', () => {
     await getIncidentHistory('token', 19);
     expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/incidents?page=0&limit=50');
     expect(fetchMock.mock.calls[1][0]).toBe('/api/v1/incidents/19/history?page=0&size=100');
+  });
+
+  it('PATCHes status with the incident version and a caller-controlled cancellation signal', async () => {
+    const updated = { id: 19, status: 'MITIGATED', version: 4 };
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(updated), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const controller = new AbortController();
+    expect(await transitionIncident('secret', 19, 'MITIGATED', 'Error rate recovered', 3, controller.signal))
+      .toEqual(updated);
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(url).toBe('/api/v1/incidents/19/status');
+    expect(options.method).toBe('PATCH');
+    expect(options.headers.Authorization).toBe('Bearer secret');
+    expect(options.headers['Content-Type']).toBe('application/json');
+    expect(options.signal).toBe(controller.signal);
+    expect(JSON.parse(options.body)).toEqual({
+      status: 'MITIGATED', message: 'Error rate recovered', expectedVersion: 3
+    });
+  });
+
+  it('preserves stale-version conflict errors for a safe UI refresh', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      message: 'Incident was modified; fetch the latest version and retry'
+    }), { status: 409 })));
+    await expect(transitionIncident('secret', 19, 'RESOLVED', 'Fixed', 2)).rejects.toMatchObject({
+      status: 409, message: 'Incident was modified; fetch the latest version and retry'
+    });
   });
 
   it('reports JSON errors and non-JSON security responses', async () => {

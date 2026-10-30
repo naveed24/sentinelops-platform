@@ -1,6 +1,6 @@
 # SentinelOps operations dashboard
 
-A responsive React + TypeScript dashboard for **read-only** service and incident monitoring, backed by the existing Spring Boot API. This first UI slice includes JWT login, service status, incident status/severity/service filters, pagination, and the first 100 audit events for a selected incident. The incident counts are explicitly scoped to the visible page; the service counts cover the complete service registry response.
+A responsive React + TypeScript dashboard for service monitoring and authorized incident lifecycle operations, backed by the existing Spring Boot API. This first UI slice includes JWT login, service status, incident status/severity/service filters, pagination, and the first 100 audit events for a selected incident. ADMIN and RESPONDER operators can acknowledge, mitigate, and resolve incidents with required audit messages; VIEWER accounts remain read-only. The incident counts are explicitly scoped to the visible page; the service counts cover the complete service registry response.
 
 ## Development
 
@@ -27,7 +27,8 @@ For production, serve the `web/dist` assets over HTTPS behind a reverse proxy th
 - Backend authorization remains authoritative. A 401 on API requests signs out the UI; 403 and network errors are shown to the operator without clearing the last successful snapshot.
 - Requests are abortable on filter changes, pagination, sign-out, and unmount. Data is fetched on login and manual refresh, **not** continuously streamed. Last refresh time is shown.
 - Incident pages are capped at 50 results; service and incident data come from separate API requests and do not form a globally atomic snapshot.
-- The audit view uses the first 100 events. Cursor-based continuation, status changes, incident creation, and notification delivery monitoring are future UI slices.
+- Incident status changes use the backend's transition policy, require a nonblank audit message (max 500 characters), and include the currently displayed incident version. A 409 conflict blocks further edits until the latest data is refreshed. The backend enforces RBAC and transition validity independently of the UI.
+- The audit view uses the first 100 events. Cursor-based continuation, incident creation, and notification delivery monitoring are future UI slices.
 
 The CI dashboard job runs Vitest API/summary tests and a TypeScript-checked production build.
 
