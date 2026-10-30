@@ -4,6 +4,7 @@ import {
   type AuditEvent, type Incident, type IncidentFilters, type Session, type ServiceRecord
 } from './api';
 import { displayTime, statusTone, summarize } from './summary';
+import { IncidentActions } from './IncidentActions';
 
 const PAGE_SIZE = 50;
 const initialFilters: IncidentFilters = { status: '', severity: '', serviceId: '' };
@@ -79,6 +80,8 @@ function Dashboard({ session, onSignOut }: {
   const [history, setHistory] = useState<AuditEvent[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState('');
+  const [historyRevision, setHistoryRevision] = useState(0);
+  const [actionNotice, setActionNotice] = useState('');
 
   useEffect(() => {
     const controller = new AbortController();
@@ -128,7 +131,7 @@ function Dashboard({ session, onSignOut }: {
         if (!controller.signal.aborted) setHistoryLoading(false);
       });
     return () => controller.abort();
-  }, [selectedId, session.accessToken, onSignOut]);
+  }, [selectedId, session.accessToken, onSignOut, historyRevision]);
 
   const stats = useMemo(() => summarize(incidents, services), [incidents, services]);
   const serviceNames = useMemo(() => new Map(services.map((service) => [service.id, service.name])), [services]);
@@ -138,11 +141,26 @@ function Dashboard({ session, onSignOut }: {
     setFilters((previous) => ({ ...previous, [name]: value }));
     setPage(0);
     setSelectedId(null);
+    setActionNotice('');
   }
 
   function changePage(next: number) {
     setPage(next);
     setSelectedId(null);
+    setActionNotice('');
+  }
+
+  function handleTransition(next: Incident) {
+    setIncidents((current) => current.map((item) => item.id === next.id ? next : item));
+    setActionNotice('Status updated to ' + next.status + '. Refreshing the incident and audit history.');
+    setHistoryRevision((value) => value + 1);
+    setRevision((value) => value + 1);
+  }
+
+  function handleStaleTransition() {
+    setActionNotice('This incident was changed by another operator. Refreshing its latest status and history.');
+    setHistoryRevision((value) => value + 1);
+    setRevision((value) => value + 1);
   }
 
   return (
@@ -225,7 +243,7 @@ function Dashboard({ session, onSignOut }: {
                 {incidents.map((incident) => (
                   <tr key={incident.id} className={selectedId === incident.id ? 'selected-row' : ''}>
                     <td><button className="incident-link" aria-pressed={selectedId === incident.id}
-                      onClick={() => setSelectedId((id) => id === incident.id ? null : incident.id)}>
+                      onClick={() => { setActionNotice(''); setSelectedId((id) => id === incident.id ? null : incident.id); }}>
                       <span className="incident-id">INC-{incident.id}</span>{incident.title}
                     </button></td>
                     <td>{serviceNames.get(incident.serviceId) ?? 'Service #' + incident.serviceId}</td>
@@ -254,6 +272,11 @@ function Dashboard({ session, onSignOut }: {
                 <button className="text-button" onClick={() => setSelectedId(null)}>Close</button>
               </div>
               <p className="muted small">{selectedIncident.description || 'No description'} · First 100 history events</p>
+              {actionNotice && <p role="status" className="notice">{actionNotice}</p>}
+              <IncidentActions key={selectedIncident.id + ':' + selectedIncident.version}
+                incident={selectedIncident} token={session.accessToken} role={session.user.role}
+                onUpdated={handleTransition} onStale={handleStaleTransition}
+                onUnauthorized={() => onSignOut('Your session expired. Please sign in again.')} />
               {historyLoading && <p role="status" className="muted">Loading audit history…</p>}
               {historyError && <p role="alert" className="error-banner">{historyError}</p>}
               {!historyLoading && !historyError && history.length === 0 && <p className="empty-state">No history events found.</p>}
@@ -267,7 +290,7 @@ function Dashboard({ session, onSignOut }: {
             </section>
           )}
         </section>
-        <footer className="footer">SentinelOps · Read-only operations dashboard · API v1</footer>
+        <footer className="footer">SentinelOps · Incident operations dashboard · API v1</footer>
       </main>
     </div>
   );
