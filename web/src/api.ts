@@ -39,6 +39,21 @@ export interface Incident {
   resolvedAt: string | null;
 }
 
+export interface NotificationSummary {
+  sampledAt: string;
+  pending: number;
+  sending: number;
+  sent: number;
+  failed: number;
+  oldestPendingAgeSeconds: number;
+}
+
+export function getNotificationSummary(
+  token: string, signal?: AbortSignal
+): Promise<NotificationSummary> {
+  return request<NotificationSummary>('/api/v1/notifications/summary', { token, signal });
+}
+
 export interface AuditEvent {
   id: number;
   fromStatus: IncidentStatus | null;
