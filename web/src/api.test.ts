@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, getIncidentHistory, getIncidents, getServices, incidentQuery, login, transitionIncident } from './api';
+import { ApiError, getNotificationSummary, getIncidentHistory, getIncidents, getServices, incidentQuery, login, transitionIncident } from './api';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -29,6 +29,22 @@ describe('authenticated API client', () => {
     expect(options.headers.Authorization).toBe('Bearer secret');
     expect(options.signal).toBe(controller.signal);
     expect(options.cache).toBe('no-store');
+  });
+
+  it('reads notification health with a bearer token, no cache, and cancellation', async () => {
+    const snapshot = {
+      sampledAt: '2026-10-31T00:00:00Z', pending: 2, sending: 1,
+      sent: 5, failed: 0, oldestPendingAgeSeconds: 90
+    };
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(snapshot), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const controller = new AbortController();
+    expect(await getNotificationSummary('secret', controller.signal)).toEqual(snapshot);
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(url).toBe('/api/v1/notifications/summary');
+    expect(options.headers.Authorization).toBe('Bearer secret');
+    expect(options.cache).toBe('no-store');
+    expect(options.signal).toBe(controller.signal);
   });
 
   it('serializes filters and paging using the backend contract', async () => {

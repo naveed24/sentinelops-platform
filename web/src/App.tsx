@@ -5,6 +5,7 @@ import {
 } from './api';
 import { displayTime, statusTone, summarize } from './summary';
 import { IncidentActions } from './IncidentActions';
+import { NotificationHealth } from './NotificationHealth';
 
 const PAGE_SIZE = 50;
 const initialFilters: IncidentFilters = { status: '', severity: '', serviceId: '' };
@@ -82,6 +83,9 @@ function Dashboard({ session, onSignOut }: {
   const [historyError, setHistoryError] = useState('');
   const [historyRevision, setHistoryRevision] = useState(0);
   const [actionNotice, setActionNotice] = useState('');
+  const handleNotificationUnauthorized = useCallback(() => {
+    onSignOut('Your session expired. Please sign in again.');
+  }, [onSignOut]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -171,6 +175,7 @@ function Dashboard({ session, onSignOut }: {
         <a className="nav-item active" href="#overview">Overview</a>
         <a className="nav-item" href="#services">Services</a>
         <a className="nav-item" href="#incidents">Incidents</a>
+        <a className="nav-item" href="#notifications">Notifications</a>
         <div className="sidebar-bottom">
           <span className="eyebrow">SIGNED IN AS</span>
           <strong>{session.user.displayName}</strong>
@@ -290,6 +295,8 @@ function Dashboard({ session, onSignOut }: {
             </section>
           )}
         </section>
+        <NotificationHealth token={session.accessToken} revision={revision}
+          onUnauthorized={handleNotificationUnauthorized} />
         <footer className="footer">SentinelOps · Incident operations dashboard · API v1</footer>
       </main>
     </div>
