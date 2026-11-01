@@ -54,6 +54,45 @@ export function getNotificationSummary(
   return request<NotificationSummary>('/api/v1/notifications/summary', { token, signal });
 }
 
+export type NotificationStatus = 'PENDING' | 'SENDING' | 'SENT' | 'FAILED';
+
+export interface NotificationItem {
+  id: number;
+  status: NotificationStatus;
+  ruleId: number;
+  ruleName: string;
+  serviceId: number;
+  serviceName: string;
+  eventType: string;
+  severity: IncidentSeverity;
+  attemptCount: number;
+  createdAt: string;
+  nextAttemptAt: string;
+  deliveredAt: string | null;
+}
+
+export interface NotificationPage {
+  items: NotificationItem[];
+  nextBeforeId: number | null;
+}
+
+/** Stable descending-id keyset cursor: new deliveries never shift older pages. */
+export function notificationQuery(
+  status: NotificationStatus | '', beforeId: number | null, limit = 25
+): string {
+  const query = new URLSearchParams({ limit: String(limit) });
+  if (status) query.set('status', status);
+  if (beforeId !== null) query.set('beforeId', String(beforeId));
+  return '/api/v1/notifications?' + query.toString();
+}
+
+export function getNotificationPage(
+  token: string, status: NotificationStatus | '', beforeId: number | null,
+  limit = 25, signal?: AbortSignal
+): Promise<NotificationPage> {
+  return request<NotificationPage>(notificationQuery(status, beforeId, limit), { token, signal });
+}
+
 export interface AuditEvent {
   id: number;
   fromStatus: IncidentStatus | null;
