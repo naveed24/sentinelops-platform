@@ -50,7 +50,7 @@ public class SecurityConfig {
                         .hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/alert-rules", "/api/v1/alert-rules/**")
                         .hasAnyRole("ADMIN", "RESPONDER", "VIEWER")
-                        .requestMatchers(HttpMethod.GET, "/api/v1/notifications/summary")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/notifications", "/api/v1/notifications/summary")
                         .hasAnyRole("ADMIN", "RESPONDER", "VIEWER")
                         .requestMatchers("/api/v1/notifications/**")
                         .hasRole("ADMIN")

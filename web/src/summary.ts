@@ -21,18 +21,22 @@ export function statusTone(value: string): string {
   switch (value) {
     case 'SEV1':
     case 'OPEN':
+    case 'FAILED':
     case 'DEGRADED':
       return 'danger';
     case 'SEV2':
     case 'ACKNOWLEDGED':
+    case 'PENDING':
     case 'MAINTENANCE':
       return 'warning';
     case 'SEV3':
     case 'MITIGATED':
+    case 'SENDING':
       return 'info';
     case 'SEV4':
     case 'RESOLVED':
     case 'ACTIVE':
+    case 'SENT':
       return 'success';
     default:
       return 'neutral';

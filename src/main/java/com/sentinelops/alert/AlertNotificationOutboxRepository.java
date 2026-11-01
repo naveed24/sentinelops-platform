@@ -88,6 +88,34 @@ public interface AlertNotificationOutboxRepository extends JpaRepository<AlertNo
     @Query("select min(n.createdAt) from AlertNotificationOutbox n where n.status = :status")
     Instant oldestCreatedAtForStatus(@Param("status") AlertNotificationStatus status);
 
+    /** Keyset pagination avoids OFFSET drift as new notifications arrive. */
+    @Query("""
+            select new com.sentinelops.alert.NotificationListItem(
+              n.id, n.status, r.id, r.name, s.id, s.name, e.eventType,
+              o.severity, n.attemptCount, n.createdAt, n.nextAttemptAt, n.deliveredAt)
+            from AlertNotificationOutbox n
+            join n.rule r join r.service s
+            join n.occurrence o join o.event e
+            where n.id < :beforeId
+            order by n.id desc
+            """)
+    List<NotificationListItem> findRecentForDashboard(
+            @Param("beforeId") long beforeId, Pageable pageable);
+
+    @Query("""
+            select new com.sentinelops.alert.NotificationListItem(
+              n.id, n.status, r.id, r.name, s.id, s.name, e.eventType,
+              o.severity, n.attemptCount, n.createdAt, n.nextAttemptAt, n.deliveredAt)
+            from AlertNotificationOutbox n
+            join n.rule r join r.service s
+            join n.occurrence o join o.event e
+            where n.status = :status and n.id < :beforeId
+            order by n.id desc
+            """)
+    List<NotificationListItem> findRecentByStatusForDashboard(
+            @Param("status") AlertNotificationStatus status,
+            @Param("beforeId") long beforeId, Pageable pageable);
+
     long countByRule_Id(Long ruleId);
     boolean existsByOccurrence_Id(Long occurrenceId);
 }

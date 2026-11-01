@@ -6,6 +6,7 @@ import {
 import { displayTime, statusTone, summarize } from './summary';
 import { IncidentActions } from './IncidentActions';
 import { NotificationHealth } from './NotificationHealth';
+import { NotificationActivity } from './NotificationActivity';
 
 const PAGE_SIZE = 50;
 const initialFilters: IncidentFilters = { status: '', severity: '', serviceId: '' };
@@ -296,6 +297,8 @@ function Dashboard({ session, onSignOut }: {
           )}
         </section>
         <NotificationHealth token={session.accessToken} revision={revision}
+          onUnauthorized={handleNotificationUnauthorized} />
+        <NotificationActivity token={session.accessToken} revision={revision}
           onUnauthorized={handleNotificationUnauthorized} />
         <footer className="footer">SentinelOps · Incident operations dashboard · API v1</footer>
       </main>

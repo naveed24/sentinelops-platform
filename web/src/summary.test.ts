@@ -29,3 +29,12 @@ describe('dashboard summaries', () => {
   });
 });
 
+
+describe('notification delivery status tones', () => {
+  it('distinguishes failed, pending, sending and delivered', () => {
+    expect(statusTone('FAILED')).toBe('danger');
+    expect(statusTone('PENDING')).toBe('warning');
+    expect(statusTone('SENDING')).toBe('info');
+    expect(statusTone('SENT')).toBe('success');
+  });
+});
