@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import {
-  ApiError, getIncidentHistory, getIncidents, getServices, login,
-  type AuditEvent, type Incident, type IncidentFilters, type Session, type ServiceRecord
+  ApiError, getIncidents, getServices, login,
+  type Incident, type IncidentFilters, type Session, type ServiceRecord
 } from './api';
 import { displayTime, statusTone, summarize } from './summary';
 import { IncidentActions } from './IncidentActions';
+import { IncidentHistory } from './IncidentHistory';
 import { NotificationHealth } from './NotificationHealth';
 import { NotificationActivity } from './NotificationActivity';
 
@@ -79,9 +80,6 @@ function Dashboard({ session, onSignOut }: {
   const [error, setError] = useState('');
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [history, setHistory] = useState<AuditEvent[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [historyError, setHistoryError] = useState('');
   const [historyRevision, setHistoryRevision] = useState(0);
   const [actionNotice, setActionNotice] = useState('');
   const handleNotificationUnauthorized = useCallback(() => {
@@ -112,31 +110,6 @@ function Dashboard({ session, onSignOut }: {
     });
     return () => controller.abort();
   }, [session.accessToken, filters.status, filters.severity, filters.serviceId, page, revision, onSignOut]);
-
-  useEffect(() => {
-    if (selectedId === null) {
-      setHistory([]);
-      setHistoryError('');
-      return;
-    }
-    const controller = new AbortController();
-    setHistoryLoading(true);
-    setHistoryError('');
-    setHistory([]);
-    getIncidentHistory(session.accessToken, selectedId, controller.signal)
-      .then((items) => { if (!controller.signal.aborted) setHistory(items); })
-      .catch((failure: unknown) => {
-        if (controller.signal.aborted) return;
-        if (failure instanceof ApiError && failure.status === 401) {
-          onSignOut('Your session expired. Please sign in again.');
-        } else {
-          setHistoryError(errorMessage(failure));
-        }
-      }).finally(() => {
-        if (!controller.signal.aborted) setHistoryLoading(false);
-      });
-    return () => controller.abort();
-  }, [selectedId, session.accessToken, onSignOut, historyRevision]);
 
   const stats = useMemo(() => summarize(incidents, services), [incidents, services]);
   const serviceNames = useMemo(() => new Map(services.map((service) => [service.id, service.name])), [services]);
@@ -277,22 +250,15 @@ function Dashboard({ session, onSignOut }: {
                 <div><p className="eyebrow">AUDIT TRAIL</p><h3 id="history-heading">INC-{selectedIncident.id}: {selectedIncident.title}</h3></div>
                 <button className="text-button" onClick={() => setSelectedId(null)}>Close</button>
               </div>
-              <p className="muted small">{selectedIncident.description || 'No description'} · First 100 history events</p>
+              <p className="muted small">{selectedIncident.description || 'No description'} · Audit trail (oldest first; load more for newer events)</p>
               {actionNotice && <p role="status" className="notice">{actionNotice}</p>}
               <IncidentActions key={selectedIncident.id + ':' + selectedIncident.version}
                 incident={selectedIncident} token={session.accessToken} role={session.user.role}
                 onUpdated={handleTransition} onStale={handleStaleTransition}
                 onUnauthorized={() => onSignOut('Your session expired. Please sign in again.')} />
-              {historyLoading && <p role="status" className="muted">Loading audit history…</p>}
-              {historyError && <p role="alert" className="error-banner">{historyError}</p>}
-              {!historyLoading && !historyError && history.length === 0 && <p className="empty-state">No history events found.</p>}
-              <ol className="timeline">
-                {history.map((event) => <li key={event.id}>
-                  <div><Pill value={event.toStatus} /> <span className="muted small">{displayTime(event.createdAt)}</span></div>
-                  <p>{event.message}</p>
-                  <small className="muted">{event.actorEmail || 'System'}{event.fromStatus ? ' · from ' + event.fromStatus : ' · created'}</small>
-                </li>)}
-              </ol>
+              <IncidentHistory key={selectedIncident.id + ':' + historyRevision}
+                token={session.accessToken} incidentId={selectedIncident.id}
+                onUnauthorized={handleNotificationUnauthorized} />
             </section>
           )}
         </section>

@@ -103,6 +103,30 @@ export interface AuditEvent {
   actorEmail: string | null;
 }
 
+export interface AuditCursor {
+  afterCreatedAt: string;
+  afterId: number;
+}
+
+/** Ascending (createdAt, id) keyset cursor; append-only audit events do not shift earlier pages. */
+export function incidentHistoryCursorQuery(
+  incidentId: number, cursor: AuditCursor | null, size = 50
+): string {
+  const query = new URLSearchParams({ size: String(size) });
+  if (cursor !== null) {
+    query.set('afterCreatedAt', cursor.afterCreatedAt);
+    query.set('afterId', String(cursor.afterId));
+  }
+  return '/api/v1/incidents/' + incidentId + '/history/cursor?' + query.toString();
+}
+
+export function getIncidentHistoryPage(
+  token: string, incidentId: number, cursor: AuditCursor | null,
+  size = 50, signal?: AbortSignal
+): Promise<AuditEvent[]> {
+  return request<AuditEvent[]>(incidentHistoryCursorQuery(incidentId, cursor, size), { token, signal });
+}
+
 export interface IncidentFilters {
   status: IncidentStatus | '';
   severity: IncidentSeverity | '';

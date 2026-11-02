@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, getNotificationSummary, getIncidentHistory, getIncidents, getServices, incidentQuery, login, transitionIncident } from './api';
+import { ApiError, getNotificationSummary, getIncidentHistory, getIncidentHistoryPage, getIncidents, getServices, incidentHistoryCursorQuery, incidentQuery, login, transitionIncident } from './api';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -94,6 +94,23 @@ describe('authenticated API client', () => {
       status: 401, message: 'Invalid credentials'
     });
     await expect(getServices('token')).rejects.toEqual(new ApiError(403, 'Request failed (403)'));
+  });
+
+  it('loads incident history through bounded keyset pages with auth and cancellation', async () => {
+    expect(incidentHistoryCursorQuery(19, null, 50))
+      .toBe('/api/v1/incidents/19/history/cursor?size=50');
+    expect(incidentHistoryCursorQuery(19, {
+      afterCreatedAt: '2026-11-02T00:00:00Z', afterId: 42
+    }, 50)).toBe('/api/v1/incidents/19/history/cursor?size=50&afterCreatedAt=2026-11-02T00%3A00%3A00Z&afterId=42');
+    const fetchMock = vi.fn().mockResolvedValue(new Response('[]', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const controller = new AbortController();
+    expect(await getIncidentHistoryPage('secret', 19, null, 50, controller.signal)).toEqual([]);
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(url).toBe('/api/v1/incidents/19/history/cursor?size=50');
+    expect(options.headers.Authorization).toBe('Bearer secret');
+    expect(options.signal).toBe(controller.signal);
+    expect(options.cache).toBe('no-store');
   });
 });
 
