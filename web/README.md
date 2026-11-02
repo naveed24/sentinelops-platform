@@ -1,6 +1,6 @@
 # SentinelOps operations dashboard
 
-A responsive React + TypeScript dashboard for service monitoring and authorized incident lifecycle operations, backed by the existing Spring Boot API. The UI includes JWT login, service status, incident status/severity/service filters, pagination, and the first 100 audit events for a selected incident. The notification panel shows pending, sending, sent and failed outbox counts and the oldest pending age using a bounded authenticated summary endpoint. A separate read-only delivery activity table supports status filtering and stable keyset pagination without exposing payloads or delivery credentials. ADMIN and RESPONDER operators can acknowledge, mitigate, and resolve incidents with required audit messages; VIEWER accounts remain read-only. The incident counts are explicitly scoped to the visible page; the service counts cover the complete service registry response.
+A responsive React + TypeScript dashboard for service monitoring and authorized incident lifecycle operations, backed by the existing Spring Boot API. The UI includes JWT login, service status, incident status/severity/service filters, pagination, and cursor-paginated audit history for a selected incident. The notification panel shows pending, sending, sent and failed outbox counts and the oldest pending age using a bounded authenticated summary endpoint. A separate read-only delivery activity table supports status filtering and stable keyset pagination without exposing payloads or delivery credentials. ADMIN and RESPONDER operators can acknowledge, mitigate, and resolve incidents with required audit messages; VIEWER accounts remain read-only. The incident counts are explicitly scoped to the visible page; the service counts cover the complete service registry response.
 
 ## Development
 
@@ -29,7 +29,7 @@ For production, serve the `web/dist` assets over HTTPS behind a reverse proxy th
 - Requests are abortable on filter changes, pagination, sign-out, and unmount. Data is fetched on login and manual refresh, **not** continuously streamed. Last refresh time is shown.
 - Incident pages are capped at 50 results; service and incident data come from separate API requests and do not form a globally atomic snapshot.
 - Incident status changes use the backend's transition policy, require a nonblank audit message (max 500 characters), and include the currently displayed incident version. A 409 conflict blocks further edits until the latest data is refreshed. The backend enforces RBAC and transition validity independently of the UI.
-- The audit view uses the first 100 events. Incident creation and detailed per-notification diagnostics are future UI slices.
+- The audit view uses the backend's ascending timestamp/ID keyset cursor (50 events per request). Operators can load additional pages without offset drift, including timelines longer than 100 events. A failed request preserves previously loaded history and offers a retry; switching incidents, signing out, or refreshing after a transition aborts obsolete requests and resets pagination. Newly appended events appear when the operator loads further pages or refreshes the incident. Incident creation and detailed per-notification diagnostics are future UI slices.
 
 The CI dashboard job runs Vitest API/summary tests and a TypeScript-checked production build.
 
