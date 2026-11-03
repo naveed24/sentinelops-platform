@@ -156,6 +156,11 @@ async function request<T>(
     ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) })
   });
   if (!response.ok) {
+    // Never display untrusted server-side exception details to operators.
+    // Preserve actionable 4xx validation/conflict messages from the API.
+    if (response.status >= 500) {
+      throw new ApiError(response.status, 'The server could not complete the request. Please retry or contact an administrator.');
+    }
     let message = 'Request failed (' + response.status + ')';
     try {
       const error: unknown = await response.json();
