@@ -25,6 +25,7 @@ For production, serve the `web/dist` assets over HTTPS behind a reverse proxy th
 
 - The JWT lives only in React memory: no localStorage, sessionStorage, cookies, or browser URL. Refreshing the page requires signing in again. The password is never persisted.
 - Backend authorization remains authoritative. A 401 on API requests signs out the UI; 403 and network errors are shown to the operator without clearing the last successful snapshot.
+- HTTP 5xx responses show a generic retry/contact-administrator message instead of untrusted server exception text, preventing accidental display of SQL errors, internal paths, or secrets. The HTTP status is retained for application logic; 4xx validation and conflict messages remain actionable. Server-side logs and tracing are the appropriate places for diagnosis.
 - Notification health and delivery activity are independently fetched and refreshed on the same manual refresh action. Failed requests retain a clearly marked stale snapshot; they never substitute zero counts. Only aggregate counts and age are returned, not payloads, webhook URLs, lease tokens, or error text.
 - Requests are abortable on filter changes, pagination, sign-out, and unmount. Data is fetched on login and manual refresh, **not** continuously streamed. Last refresh time is shown.
 - Incident pages are capped at 50 results; service and incident data come from separate API requests and do not form a globally atomic snapshot.
