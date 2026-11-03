@@ -96,6 +96,29 @@ describe('authenticated API client', () => {
     await expect(getServices('token')).rejects.toEqual(new ApiError(403, 'Request failed (403)'));
   });
 
+  it('redacts sensitive server errors while retaining HTTP status for handling', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        message: 'Database password secret=do-not-expose; SQL connection failed'
+      }), { status: 500 }))
+      .mockResolvedValueOnce(new Response('<html>upstream token=private</html>', { status: 502 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    for (const status of [500, 502]) {
+      try {
+        await getServices('operator-token');
+        throw new Error('Expected a server error');
+      } catch (error) {
+        expect(error).toBeInstanceOf(ApiError);
+        expect(error).toMatchObject({
+          status,
+          message: 'The server could not complete the request. Please retry or contact an administrator.'
+        });
+        expect(String(error)).not.toMatch(/password|secret|token=private|SQL connection/i);
+      }
+    }
+  });
+
   it('loads incident history through bounded keyset pages with auth and cancellation', async () => {
     expect(incidentHistoryCursorQuery(19, null, 50))
       .toBe('/api/v1/incidents/19/history/cursor?size=50');
