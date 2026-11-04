@@ -91,9 +91,25 @@ describe('authenticated API client', () => {
       .mockResolvedValueOnce(new Response('Forbidden', { status: 403 }));
     vi.stubGlobal('fetch', fetchMock);
     await expect(login('op@example.com', 'wrong')).rejects.toMatchObject({
-      status: 401, message: 'Invalid credentials'
+      status: 401, message: 'Authentication required. Please sign in again.'
     });
-    await expect(getServices('token')).rejects.toEqual(new ApiError(403, 'Request failed (403)'));
+    await expect(getServices('token')).rejects.toEqual(new ApiError(403, 'You do not have permission to perform this action.'));
+  });
+
+  it('never exposes untrusted authentication and authorization error bodies', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        message: 'Internal LDAP host=private.example password=secret'
+      }), { status: 401 }))
+      .mockResolvedValueOnce(new Response('<html>internal policy token=private</html>', { status: 403 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(login('op@example.com', 'wrong')).rejects.toEqual(
+      new ApiError(401, 'Authentication required. Please sign in again.')
+    );
+    await expect(getServices('token')).rejects.toEqual(
+      new ApiError(403, 'You do not have permission to perform this action.')
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('redacts sensitive server errors while retaining HTTP status for handling', async () => {
