@@ -169,6 +169,10 @@ async function request<T>(
     if (response.status === 403) {
       throw new ApiError(403, 'You do not have permission to perform this action.');
     }
+    // 429 bodies may come from an edge proxy and contain internal rate-limit policy details.
+    if (response.status === 429) {
+      throw new ApiError(429, 'Too many requests. Please wait before retrying.');
+    }
     let message = 'Request failed (' + response.status + ')';
     try {
       const error: unknown = await response.json();
