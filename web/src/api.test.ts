@@ -112,6 +112,21 @@ describe('authenticated API client', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it('redacts untrusted rate-limit responses while preserving 429 for retry handling', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        message: 'Proxy policy internal-bucket=secret and private upstream details'
+      }), { status: 429, headers: { 'Retry-After': '60' } }))
+      .mockResolvedValueOnce(new Response('<html>internal proxy configuration</html>', { status: 429 }));
+    vi.stubGlobal('fetch', fetchMock);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      await expect(getServices('operator-token')).rejects.toEqual(
+        new ApiError(429, 'Too many requests. Please wait before retrying.')
+      );
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it('redacts sensitive server errors while retaining HTTP status for handling', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({
