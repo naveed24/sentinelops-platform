@@ -5,9 +5,15 @@ on:
   push:
     branches: [main, 'feature/**']
 
+# Cancel obsolete PR/feature-branch runs, but never cancel a main verification run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
     steps:
