@@ -88,9 +88,9 @@ describe('authenticated API client', () => {
   it('bounds and normalizes untrusted validation messages without losing conflict status', async () => {
     const longMessage = 'x'.repeat(1200);
     const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify({ message: '\\u0000  Invalid\\n status\\t  ' }), { status: 400 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ message: '\u0000  Invalid\n status\t  ' }), { status: 400 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ message: longMessage }), { status: 409 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ message: ' \\n\\t ' }), { status: 422 }));
+      .mockResolvedValueOnce(new Response(JSON.stringify({ message: ' \n\t ' }), { status: 422 }));
     vi.stubGlobal('fetch', fetchMock);
     await expect(getServices('token')).rejects.toEqual(new ApiError(400, 'Invalid  status'));
     await expect(getServices('token')).rejects.toEqual(new ApiError(409, 'x'.repeat(500)));
