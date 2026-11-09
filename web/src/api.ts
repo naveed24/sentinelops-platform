@@ -181,7 +181,7 @@ async function request<T>(
         // Bound untrusted validation text before it reaches operator-facing UI.
         // Keep meaningful 400/409 messages, but remove terminal controls and
         // prevent oversized upstream payloads from overwhelming the dashboard.
-        const safeMessage = error.message.replace(/[\\u0000-\\u001f\\u007f-\\u009f]/g, ' ').trim();
+        const safeMessage = error.message.replace(/[\u0000-\u001f\u007f-\u009f]/g, ' ').trim();
         if (safeMessage) message = safeMessage.slice(0, 500);
       }
     } catch {
