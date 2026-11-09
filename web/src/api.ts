@@ -178,7 +178,11 @@ async function request<T>(
       const error: unknown = await response.json();
       if (error && typeof error === 'object' && 'message' in error &&
           typeof error.message === 'string' && error.message.trim()) {
-        message = error.message;
+        // Bound untrusted validation text before it reaches operator-facing UI.
+        // Keep meaningful 400/409 messages, but remove terminal controls and
+        // prevent oversized upstream payloads from overwhelming the dashboard.
+        const safeMessage = error.message.replace(/[\\u0000-\\u001f\\u007f-\\u009f]/g, ' ').trim();
+        if (safeMessage) message = safeMessage.slice(0, 500);
       }
     } catch {
       // Spring Security may return a non-JSON 401/403 response.
