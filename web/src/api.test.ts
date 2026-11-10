@@ -97,6 +97,33 @@ describe('authenticated API client', () => {
     await expect(getServices('token')).rejects.toEqual(new ApiError(422, 'Request failed (422)'));
   });
 
+  it('redacts unexpected client-error bodies while retaining HTTP status', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        message: 'Internal router path /admin/private and upstream secret'
+      }), { status: 404 }))
+      .mockResolvedValueOnce(new Response('<html>proxy backend=internal-host</html>', { status: 405 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        message: 'Gateway policy secret=do-not-expose'
+      }), { status: 408 }));
+    vi.stubGlobal('fetch', fetchMock);
+    for (const status of [404, 405, 408]) {
+      await expect(getServices('token')).rejects.toEqual(
+        new ApiError(status, 'Request failed (' + status + '). Please retry or contact an administrator.')
+      );
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('preserves bounded application validation details for 422', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      message: 'Invalid incident field'
+    }), { status: 422 })));
+    await expect(getServices('token')).rejects.toEqual(
+      new ApiError(422, 'Invalid incident field')
+    );
+  });
+
   it('reports JSON errors and non-JSON security responses', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ message: 'Invalid credentials' }), { status: 401 }))
