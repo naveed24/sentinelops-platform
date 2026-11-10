@@ -173,6 +173,12 @@ async function request<T>(
     if (response.status === 429) {
       throw new ApiError(429, 'Too many requests. Please wait before retrying.');
     }
+    // Only the application's validation and optimistic-concurrency responses are
+    // eligible for display. Other 4xx bodies can originate from gateways, WAFs,
+    // proxies or framework handlers and may expose internal diagnostics.
+    if (![400, 409, 422].includes(response.status)) {
+      throw new ApiError(response.status, 'Request failed (' + response.status + '). Please retry or contact an administrator.');
+    }
     let message = 'Request failed (' + response.status + ')';
     try {
       const error: unknown = await response.json();
