@@ -16,7 +16,20 @@ describe('authenticated API client', () => {
     expect(url).toBe('/api/v1/auth/login');
     expect(options.method).toBe('POST');
     expect(options.headers.Authorization).toBeUndefined();
+    expect(options.redirect).toBe('error');
+    expect(options.credentials).toBe('omit');
     expect(JSON.parse(options.body)).toEqual({ email: 'op@example.com', password: 'a-password' });
+  });
+
+  it('fails closed on redirected API requests without retrying with credentials', async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(getServices('secret')).rejects.toThrow('Failed to fetch');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({
+      redirect: 'error', credentials: 'omit',
+      headers: { Authorization: 'Bearer secret' }
+    });
   });
 
   it('adds bearer authorization to service requests and forwards cancellation', async () => {
@@ -29,6 +42,8 @@ describe('authenticated API client', () => {
     expect(options.headers.Authorization).toBe('Bearer secret');
     expect(options.signal).toBe(controller.signal);
     expect(options.cache).toBe('no-store');
+    expect(options.redirect).toBe('error');
+    expect(options.credentials).toBe('omit');
   });
 
   it('reads notification health with a bearer token, no cache, and cancellation', async () => {

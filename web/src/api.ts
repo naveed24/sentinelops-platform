@@ -148,6 +148,9 @@ async function request<T>(
     method: options.method ?? 'GET',
     signal: options.signal,
     cache: 'no-store',
+    // JWT requests must not follow login/proxy redirects or send ambient cookies.
+    redirect: 'error',
+    credentials: 'omit',
     headers: {
       Accept: 'application/json',
       ...(options.body === undefined ? {} : { 'Content-Type': 'application/json' }),

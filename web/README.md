@@ -23,6 +23,7 @@ For production, serve the `web/dist` assets over HTTPS behind a reverse proxy th
 
 ## Security and operational behavior
 
+- API fetches reject HTTP redirects and omit ambient browser cookies. This prevents following unexpected login/proxy redirects with an authenticated request; redirect failures are treated as network errors and require operator investigation. The backend remains JWT-only.
 - The JWT lives only in React memory: no localStorage, sessionStorage, cookies, or browser URL. Refreshing the page requires signing in again. The password is never persisted.
 - Backend authorization remains authoritative. A 401 on API requests signs out the UI; 403 and network errors are shown to the operator without clearing the last successful snapshot.
 - HTTP 401 and 403 responses use fixed, operator-safe messages instead of untrusted proxy or authentication-filter response bodies. HTTP status codes remain available for sign-out and access-denied handling; 400/409 validation and conflict details remain actionable.\n- Only HTTP 400, 409, and 422 application validation/conflict messages are eligible for bounded display. Other unexpected 4xx responses (such as 404, 405, or 408) use fixed status-aware messages instead of untrusted proxy, gateway, or framework diagnostics; callers retain the HTTP status.
