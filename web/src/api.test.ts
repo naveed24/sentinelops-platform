@@ -40,10 +40,49 @@ describe('authenticated API client', () => {
     const [url, options] = fetchMock.mock.calls[0];
     expect(url).toBe('/api/v1/services');
     expect(options.headers.Authorization).toBe('Bearer secret');
-    expect(options.signal).toBe(controller.signal);
+    expect(options.signal).toBeInstanceOf(AbortSignal);
+    expect(options.signal).not.toBe(controller.signal);
+    controller.abort();
+    expect(options.signal.aborted).toBe(true);
     expect(options.cache).toBe('no-store');
     expect(options.redirect).toBe('error');
     expect(options.credentials).toBe('omit');
+  });
+
+  it('bounds stalled API calls and propagates timeout without retrying', async () => {
+    const timeoutController = new AbortController();
+    const timeoutSpy = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(timeoutController.signal);
+    try {
+      const fetchMock = vi.fn().mockImplementation((_url: string, options: RequestInit) =>
+        new Promise((_resolve, reject) => {
+          options.signal?.addEventListener('abort', () =>
+            reject(options.signal?.reason), { once: true });
+        })
+      );
+      vi.stubGlobal('fetch', fetchMock);
+      const pending = getServices('secret');
+      expect(timeoutSpy).toHaveBeenCalledWith(20_000);
+      timeoutController.abort(new DOMException('API request timed out', 'TimeoutError'));
+      await expect(pending).rejects.toMatchObject({ name: 'TimeoutError' });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally {
+      timeoutSpy.mockRestore();
+    }
+  });
+
+  it('allows caller cancellation before the timeout without retrying', async () => {
+    const controller = new AbortController();
+    const fetchMock = vi.fn().mockImplementation((_url: string, options: RequestInit) =>
+      new Promise((_resolve, reject) => {
+        options.signal?.addEventListener('abort', () =>
+          reject(options.signal?.reason), { once: true });
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const pending = getServices('secret', controller.signal);
+    controller.abort(new DOMException('Operator signed out', 'AbortError'));
+    await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('reads notification health with a bearer token, no cache, and cancellation', async () => {
@@ -59,7 +98,10 @@ describe('authenticated API client', () => {
     expect(url).toBe('/api/v1/notifications/summary');
     expect(options.headers.Authorization).toBe('Bearer secret');
     expect(options.cache).toBe('no-store');
-    expect(options.signal).toBe(controller.signal);
+    expect(options.signal).toBeInstanceOf(AbortSignal);
+    expect(options.signal).not.toBe(controller.signal);
+    controller.abort();
+    expect(options.signal.aborted).toBe(true);
   });
 
   it('serializes filters and paging using the backend contract', async () => {
@@ -85,7 +127,10 @@ describe('authenticated API client', () => {
     expect(options.method).toBe('PATCH');
     expect(options.headers.Authorization).toBe('Bearer secret');
     expect(options.headers['Content-Type']).toBe('application/json');
-    expect(options.signal).toBe(controller.signal);
+    expect(options.signal).toBeInstanceOf(AbortSignal);
+    expect(options.signal).not.toBe(controller.signal);
+    controller.abort();
+    expect(options.signal.aborted).toBe(true);
     expect(JSON.parse(options.body)).toEqual({
       status: 'MITIGATED', message: 'Error rate recovered', expectedVersion: 3
     });
@@ -217,7 +262,10 @@ describe('authenticated API client', () => {
     const [url, options] = fetchMock.mock.calls[0];
     expect(url).toBe('/api/v1/incidents/19/history/cursor?size=50');
     expect(options.headers.Authorization).toBe('Bearer secret');
-    expect(options.signal).toBe(controller.signal);
+    expect(options.signal).toBeInstanceOf(AbortSignal);
+    expect(options.signal).not.toBe(controller.signal);
+    controller.abort();
+    expect(options.signal.aborted).toBe(true);
     expect(options.cache).toBe('no-store');
   });
 });
