@@ -26,7 +26,10 @@ describe('notification activity API', () => {
     expect(url).toBe('/api/v1/notifications?limit=25&status=FAILED&beforeId=123');
     expect(options.headers.Authorization).toBe('Bearer token');
     expect(options.cache).toBe('no-store');
-    expect(options.signal).toBe(controller.signal);
+    expect(options.signal).toBeInstanceOf(AbortSignal);
+    expect(options.signal).not.toBe(controller.signal);
+    controller.abort();
+    expect(options.signal.aborted).toBe(true);
     expect(options.method).toBe('GET');
     expect(options.body).toBeUndefined();
   });

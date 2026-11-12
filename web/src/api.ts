@@ -144,9 +144,16 @@ async function request<T>(
   path: string,
   options: { token?: string; method?: string; body?: unknown; signal?: AbortSignal } = {}
 ): Promise<T> {
+  // Bound stalled API calls without defeating caller cancellation (navigation/sign-out).
+  // AbortSignal.any preserves whichever cancellation happens first; timeout signals
+  // do not need manual timer cleanup and do not trigger automatic retries.
+  const timeoutSignal = AbortSignal.timeout(20_000);
+  const signal = options.signal
+    ? AbortSignal.any([options.signal, timeoutSignal])
+    : timeoutSignal;
   const response = await fetch(path, {
     method: options.method ?? 'GET',
-    signal: options.signal,
+    signal,
     cache: 'no-store',
     // JWT requests must not follow login/proxy redirects or send ambient cookies.
     redirect: 'error',
