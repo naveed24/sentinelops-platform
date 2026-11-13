@@ -151,7 +151,9 @@ async function request<T>(
   const signal = options.signal
     ? AbortSignal.any([options.signal, timeoutSignal])
     : timeoutSignal;
-  const response = await fetch(path, {
+  let response: Response;
+  try {
+    response = await fetch(path, {
     method: options.method ?? 'GET',
     signal,
     cache: 'no-store',
@@ -164,7 +166,15 @@ async function request<T>(
       ...(options.token ? { Authorization: 'Bearer ' + options.token } : {})
     },
     ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) })
-  });
+    });
+  } catch (error) {
+    // Distinguish our deadline from operator-driven cancellation. Do not
+    // transform sign-out/navigation aborts into visible retry messages.
+    if (timeoutSignal.aborted && !options.signal?.aborted) {
+      throw new ApiError(0, 'The request timed out. Please retry.');
+    }
+    throw error;
+  }
   if (!response.ok) {
     // Never display untrusted server-side exception details to operators.
     // Preserve actionable 4xx validation/conflict messages from the API.
