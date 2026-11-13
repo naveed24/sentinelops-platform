@@ -63,11 +63,40 @@ describe('authenticated API client', () => {
       const pending = getServices('secret');
       expect(timeoutSpy).toHaveBeenCalledWith(20_000);
       timeoutController.abort(new DOMException('API request timed out', 'TimeoutError'));
-      await expect(pending).rejects.toMatchObject({ name: 'TimeoutError' });
+      await expect(pending).rejects.toEqual(new ApiError(0, 'The request timed out. Please retry.'));
       expect(fetchMock).toHaveBeenCalledTimes(1);
     } finally {
       timeoutSpy.mockRestore();
     }
+  });
+
+  it('preserves caller cancellation when it races with the deadline', async () => {
+    const controller = new AbortController();
+    const timeoutController = new AbortController();
+    const timeoutSpy = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(timeoutController.signal);
+    try {
+      const fetchMock = vi.fn().mockImplementation((_url: string, options: RequestInit) =>
+        new Promise((_resolve, reject) => {
+          options.signal?.addEventListener('abort', () =>
+            reject(options.signal?.reason), { once: true });
+        })
+      );
+      vi.stubGlobal('fetch', fetchMock);
+      const pending = getServices('secret', controller.signal);
+      controller.abort(new DOMException('Operator signed out', 'AbortError'));
+      timeoutController.abort(new DOMException('Request timed out', 'TimeoutError'));
+      await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally {
+      timeoutSpy.mockRestore();
+    }
+  });
+
+  it('does not mislabel ordinary network failures as timeouts', async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(getServices('secret')).rejects.toThrow('Failed to fetch');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('allows caller cancellation before the timeout without retrying', async () => {
