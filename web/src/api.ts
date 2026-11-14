@@ -215,7 +215,19 @@ async function request<T>(
     }
     throw new ApiError(response.status, message);
   }
-  return response.json() as Promise<T>;
+  // A proxy or misconfigured upstream can return HTML or an empty body with
+  // HTTP 200. Do not surface parser internals as operator-facing diagnostics.
+  // Keep the failure distinct from HTTP status errors for callers.
+  try {
+    return await response.json() as T;
+  } catch (error) {
+    // Caller cancellation must remain silent during navigation or sign-out.
+    if (options.signal?.aborted) throw error;
+    if (timeoutSignal.aborted) {
+      throw new ApiError(0, 'The request timed out. Please retry.');
+    }
+    throw new ApiError(502, 'The server returned an invalid response. Please retry or contact an administrator.');
+  }
 }
 
 export function login(email: string, password: string): Promise<Session> {
