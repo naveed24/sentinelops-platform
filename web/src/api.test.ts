@@ -114,6 +114,38 @@ describe('authenticated API client', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('rejects malformed successful API responses with a safe error', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response('<html>internal gateway hostname</html>', { status: 200 }))
+      .mockResolvedValueOnce(new Response('', { status: 200 }))
+      .mockResolvedValueOnce(new Response('null', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      await expect(getServices('secret')).rejects.toEqual(new ApiError(
+        502, 'The server returned an invalid response. Please retry or contact an administrator.'
+      ));
+    }
+    expect(await getServices('secret')).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('preserves caller cancellation while parsing a successful response', async () => {
+    const controller = new AbortController();
+    const abortError = new DOMException('Operator signed out', 'AbortError');
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => new Promise((_resolve, reject) => {
+        controller.signal.addEventListener('abort', () => reject(abortError), { once: true });
+      })
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const pending = getServices('secret', controller.signal);
+    // Allow the fetch continuation to begin parsing before cancellation.
+    await Promise.resolve();
+    controller.abort(abortError);
+    await expect(pending).rejects.toBe(abortError);
+  });
+
   it('reads notification health with a bearer token, no cache, and cancellation', async () => {
     const snapshot = {
       sampledAt: '2026-10-31T00:00:00Z', pending: 2, sending: 1,
