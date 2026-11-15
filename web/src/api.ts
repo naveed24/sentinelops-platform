@@ -210,8 +210,18 @@ async function request<T>(
         const safeMessage = error.message.replace(/[\u0000-\u001f\u007f-\u009f]/g, ' ').trim();
         if (safeMessage) message = safeMessage.slice(0, 500);
       }
-    } catch {
-      // Spring Security may return a non-JSON 401/403 response.
+    } catch (error) {
+      // A cancellation while reading an error body is not a validation failure.
+      // Preserve sign-out/navigation cancellation and the request deadline.
+      if (options.signal?.aborted) throw options.signal.reason ?? error;
+      if (timeoutSignal.aborted) {
+        throw new ApiError(0, 'The request timed out. Please retry.');
+      }
+      // Invalid error JSON falls back to the bounded status-specific message.
+    }
+    if (options.signal?.aborted) throw options.signal.reason;
+    if (timeoutSignal.aborted) {
+      throw new ApiError(0, 'The request timed out. Please retry.');
     }
     throw new ApiError(response.status, message);
   }
