@@ -49,6 +49,48 @@ describe('authenticated API client', () => {
     expect(options.credentials).toBe('omit');
   });
 
+  it('does not send a request when the caller signal is already aborted', async () => {
+    const controller = new AbortController();
+    const reason = new DOMException('Operator signed out', 'AbortError');
+    controller.abort(reason);
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(getServices('secret', controller.signal)).rejects.toBe(reason);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('discards a parsed success response when sign-out occurs during parsing', async () => {
+    const controller = new AbortController();
+    const reason = new DOMException('Operator signed out', 'AbortError');
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => {
+        controller.abort(reason);
+        return [{ id: 1 }];
+      }
+    }));
+    await expect(getServices('secret', controller.signal)).rejects.toBe(reason);
+  });
+
+  it('reports a deadline reached during successful response parsing', async () => {
+    const timeoutController = new AbortController();
+    const timeoutSpy = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(timeoutController.signal);
+    try {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => {
+          timeoutController.abort(new DOMException('Deadline', 'TimeoutError'));
+          return [{ id: 1 }];
+        }
+      }));
+      await expect(getServices('secret')).rejects.toEqual(
+        new ApiError(0, 'The request timed out. Please retry.')
+      );
+    } finally {
+      timeoutSpy.mockRestore();
+    }
+  });
+
   it('bounds stalled API calls and propagates timeout without retrying', async () => {
     const timeoutController = new AbortController();
     const timeoutSpy = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(timeoutController.signal);
