@@ -153,6 +153,8 @@ async function request<T>(
     : timeoutSignal;
   let response: Response;
   try {
+    // Never dispatch a request after sign-out/navigation has already cancelled it.
+    if (options.signal?.aborted) throw options.signal.reason;
     response = await fetch(path, {
     method: options.method ?? 'GET',
     signal,
@@ -229,7 +231,13 @@ async function request<T>(
   // HTTP 200. Do not surface parser internals as operator-facing diagnostics.
   // Keep the failure distinct from HTTP status errors for callers.
   try {
-    return await response.json() as T;
+    const data = await response.json() as T;
+    // A response can finish parsing just as the operator signs out.
+    if (options.signal?.aborted) throw options.signal.reason;
+    if (timeoutSignal.aborted) {
+      throw new ApiError(0, 'The request timed out. Please retry.');
+    }
+    return data;
   } catch (error) {
     // Caller cancellation must remain silent during navigation or sign-out.
     if (options.signal?.aborted) throw error;
