@@ -244,6 +244,7 @@ async function request<T>(
     if (timeoutSignal.aborted) {
       throw new ApiError(0, 'The request timed out. Please retry.');
     }
+    if (error instanceof ApiError) throw error;
     throw new ApiError(502, 'The server returned an invalid response. Please retry or contact an administrator.');
   }
 }
