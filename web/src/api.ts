@@ -155,6 +155,7 @@ async function request<T>(
   try {
     // Never dispatch a request after sign-out/navigation has already cancelled it.
     if (options.signal?.aborted) throw options.signal.reason;
+    if (timeoutSignal.aborted) throw new ApiError(0, 'The request timed out. Please retry.');
     response = await fetch(path, {
     method: options.method ?? 'GET',
     signal,
@@ -176,6 +177,12 @@ async function request<T>(
       throw new ApiError(0, 'The request timed out. Please retry.');
     }
     throw error;
+  }
+  // Fetch can resolve at the same instant navigation or the deadline aborts.
+  // Never surface a stale HTTP error (including auth errors) after cancellation.
+  if (options.signal?.aborted) throw options.signal.reason;
+  if (timeoutSignal.aborted) {
+    throw new ApiError(0, 'The request timed out. Please retry.');
   }
   if (!response.ok) {
     // Never display untrusted server-side exception details to operators.

@@ -59,6 +59,48 @@ describe('authenticated API client', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('does not dispatch requests when their deadline has already expired', async () => {
+    const timeoutController = new AbortController();
+    timeoutController.abort(new DOMException('Deadline', 'TimeoutError'));
+    const timeoutSpy = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(timeoutController.signal);
+    try {
+      const fetchMock = vi.fn();
+      vi.stubGlobal('fetch', fetchMock);
+      await expect(getServices('secret')).rejects.toEqual(
+        new ApiError(0, 'The request timed out. Please retry.')
+      );
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      timeoutSpy.mockRestore();
+    }
+  });
+
+  it('ignores an HTTP auth error when the operator signs out before fetch resolves', async () => {
+    const controller = new AbortController();
+    const reason = new DOMException('Operator signed out', 'AbortError');
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => {
+      controller.abort(reason);
+      return new Response('private proxy diagnostic', { status: 401 });
+    }));
+    await expect(getServices('secret', controller.signal)).rejects.toBe(reason);
+  });
+
+  it('reports a deadline instead of a stale HTTP failure when fetch resolves late', async () => {
+    const timeoutController = new AbortController();
+    const timeoutSpy = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(timeoutController.signal);
+    try {
+      vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => {
+        timeoutController.abort(new DOMException('Deadline', 'TimeoutError'));
+        return new Response('upstream unavailable', { status: 503 });
+      }));
+      await expect(getServices('secret')).rejects.toEqual(
+        new ApiError(0, 'The request timed out. Please retry.')
+      );
+    } finally {
+      timeoutSpy.mockRestore();
+    }
+  });
+
   it('discards a parsed success response when sign-out occurs during parsing', async () => {
     const controller = new AbortController();
     const reason = new DOMException('Operator signed out', 'AbortError');
