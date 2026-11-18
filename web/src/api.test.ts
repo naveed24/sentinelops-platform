@@ -202,15 +202,17 @@ describe('authenticated API client', () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response('<html>internal gateway hostname</html>', { status: 200 }))
       .mockResolvedValueOnce(new Response('', { status: 200 }))
-      .mockResolvedValueOnce(new Response('null', { status: 200 }));
+      .mockResolvedValueOnce(new Response('null', { status: 200 }))
+      .mockResolvedValueOnce(new Response('42', { status: 200 }))
+      .mockResolvedValueOnce(new Response('"unexpected"', { status: 200 }))
+      .mockResolvedValueOnce(new Response('false', { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
-    for (let attempt = 0; attempt < 2; attempt++) {
+    for (let attempt = 0; attempt < 6; attempt++) {
       await expect(getServices('secret')).rejects.toEqual(new ApiError(
         502, 'The server returned an invalid response. Please retry or contact an administrator.'
       ));
     }
-    expect(await getServices('secret')).toBeNull();
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenCalledTimes(6);
   });
 
   it('preserves caller cancellation while parsing a successful response', async () => {
