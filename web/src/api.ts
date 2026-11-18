@@ -238,13 +238,19 @@ async function request<T>(
   // HTTP 200. Do not surface parser internals as operator-facing diagnostics.
   // Keep the failure distinct from HTTP status errors for callers.
   try {
-    const data = await response.json() as T;
+    const data: unknown = await response.json();
+    // Every current endpoint returns an object or array. JSON null and scalar
+    // values are valid JSON but invalid API envelopes; reject them before UI
+    // consumers dereference fields or treat an invalid response as success.
+    if (data === null || typeof data !== 'object') {
+      throw new ApiError(502, 'The server returned an invalid response. Please retry or contact an administrator.');
+    }
     // A response can finish parsing just as the operator signs out.
     if (options.signal?.aborted) throw options.signal.reason;
     if (timeoutSignal.aborted) {
       throw new ApiError(0, 'The request timed out. Please retry.');
     }
-    return data;
+    return data as T;
   } catch (error) {
     // Caller cancellation must remain silent during navigation or sign-out.
     if (options.signal?.aborted) throw error;
