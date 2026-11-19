@@ -21,6 +21,34 @@ describe('authenticated API client', () => {
     expect(JSON.parse(options.body)).toEqual({ email: 'op@example.com', password: 'a-password' });
   });
 
+  it('rejects malformed login envelopes instead of storing an invalid JWT session', async () => {
+    const valid = {
+      accessToken: 'jwt', tokenType: 'Bearer', expiresAt: '2026-11-29T12:00:00Z',
+      user: { id: 1, displayName: 'Operator', email: 'op@example.com', role: 'RESPONDER' }
+    };
+    const invalid = [
+      { ...valid, accessToken: '' },
+      { ...valid, tokenType: 'Basic' },
+      { ...valid, expiresAt: 'not-a-date' },
+      { ...valid, user: null },
+      { ...valid, user: { ...valid.user, id: 0 } },
+      { ...valid, user: { ...valid.user, role: 'SUPERUSER' } },
+      { ...valid, user: { ...valid.user, email: '' } },
+      [valid]
+    ];
+    const fetchMock = vi.fn();
+    for (const payload of invalid) {
+      fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(payload), { status: 200 }));
+    }
+    vi.stubGlobal('fetch', fetchMock);
+    for (const _payload of invalid) {
+      await expect(login('op@example.com', 'password')).rejects.toEqual(new ApiError(
+        502, 'The server returned an invalid authentication response. Please retry or contact an administrator.'
+      ));
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(invalid.length);
+  });
+
   it('fails closed on redirected API requests without retrying with credentials', async () => {
     const fetchMock = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
     vi.stubGlobal('fetch', fetchMock);
