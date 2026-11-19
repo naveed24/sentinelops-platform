@@ -262,11 +262,32 @@ async function request<T>(
   }
 }
 
-export function login(email: string, password: string): Promise<Session> {
-  return request<Session>('/api/v1/auth/login', {
+/** Reject malformed authentication envelopes before they can enter React state. */
+function isSession(value: unknown): value is Session {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+  const session = value as Record<string, unknown>;
+  const user = session.user;
+  if (user === null || typeof user !== 'object' || Array.isArray(user)) return false;
+  const operator = user as Record<string, unknown>;
+  return session.tokenType === 'Bearer' &&
+    typeof session.accessToken === 'string' && session.accessToken.trim().length > 0 &&
+    typeof session.expiresAt === 'string' &&
+    Number.isFinite(Date.parse(session.expiresAt)) &&
+    typeof operator.id === 'number' && Number.isSafeInteger(operator.id) && operator.id > 0 &&
+    typeof operator.displayName === 'string' && operator.displayName.trim().length > 0 &&
+    typeof operator.email === 'string' && operator.email.trim().length > 0 &&
+    ['ADMIN', 'RESPONDER', 'VIEWER'].includes(String(operator.role));
+}
+
+export async function login(email: string, password: string): Promise<Session> {
+  const session = await request<unknown>('/api/v1/auth/login', {
     method: 'POST',
     body: { email, password }
   });
+  if (!isSession(session)) {
+    throw new ApiError(502, 'The server returned an invalid authentication response. Please retry or contact an administrator.');
+  }
+  return session;
 }
 
 export function getServices(token: string, signal?: AbortSignal): Promise<ServiceRecord[]> {
