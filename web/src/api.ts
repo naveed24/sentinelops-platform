@@ -270,8 +270,12 @@ function isSession(value: unknown): value is Session {
   if (user === null || typeof user !== 'object' || Array.isArray(user)) return false;
   const operator = user as Record<string, unknown>;
   return session.tokenType === 'Bearer' &&
-    typeof session.accessToken === 'string' && session.accessToken.trim().length > 0 &&
+    typeof session.accessToken === 'string' &&
+    // Bearer credentials must be one token, without whitespace or controls.
+    /^[A-Za-z0-9._~+/-]+={0,2}$/.test(session.accessToken) &&
     typeof session.expiresAt === 'string' &&
+    // Explicit timezone avoids accepting ambiguous local timestamps.
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(session.expiresAt) &&
     Number.isFinite(Date.parse(session.expiresAt)) &&
     typeof operator.id === 'number' && Number.isSafeInteger(operator.id) && operator.id > 0 &&
     typeof operator.displayName === 'string' && operator.displayName.trim().length > 0 &&
