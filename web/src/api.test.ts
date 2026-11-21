@@ -6,7 +6,7 @@ afterEach(() => vi.unstubAllGlobals());
 describe('authenticated API client', () => {
   it('posts credentials without authorization headers', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      accessToken: 'jwt', tokenType: 'Bearer', expiresAt: '2026-10-29T12:00:00Z',
+      accessToken: 'jwt', tokenType: 'Bearer', expiresAt: '2099-10-29T12:00:00Z',
       user: { id: 1, displayName: 'Operator', email: 'op@example.com', role: 'VIEWER' }
     }), { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
@@ -23,13 +23,15 @@ describe('authenticated API client', () => {
 
   it('rejects malformed login envelopes instead of storing an invalid JWT session', async () => {
     const valid = {
-      accessToken: 'jwt', tokenType: 'Bearer', expiresAt: '2026-11-29T12:00:00Z',
+      accessToken: 'jwt', tokenType: 'Bearer', expiresAt: '2099-11-29T12:00:00Z',
       user: { id: 1, displayName: 'Operator', email: 'op@example.com', role: 'RESPONDER' }
     };
     const invalid = [
       { ...valid, accessToken: '' },
       { ...valid, tokenType: 'Basic' },
       { ...valid, expiresAt: 'not-a-date' },
+      { ...valid, expiresAt: '2000-01-01T00:00:00Z' },
+      { ...valid, expiresAt: new Date(Date.now() - 60_000).toISOString() },
       { ...valid, user: null },
       { ...valid, user: { ...valid.user, id: 0 } },
       { ...valid, user: { ...valid.user, role: 'SUPERUSER' } },
