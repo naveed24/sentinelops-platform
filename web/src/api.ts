@@ -277,6 +277,8 @@ function isSession(value: unknown): value is Session {
     // Explicit timezone avoids accepting ambiguous local timestamps.
     /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(session.expiresAt) &&
     Number.isFinite(Date.parse(session.expiresAt)) &&
+    // An already-expired login must not become an authenticated UI session.
+    Date.parse(session.expiresAt) > Date.now() &&
     typeof operator.id === 'number' && Number.isSafeInteger(operator.id) && operator.id > 0 &&
     typeof operator.displayName === 'string' && operator.displayName.trim().length > 0 &&
     typeof operator.email === 'string' && operator.email.trim().length > 0 &&
