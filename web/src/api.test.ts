@@ -51,6 +51,31 @@ describe('authenticated API client', () => {
     expect(fetchMock).toHaveBeenCalledTimes(invalid.length);
   });
 
+  it('rejects impossible calendar dates and accepts leap-day timezone offsets', async () => {
+    const valid = {
+      accessToken: 'jwt', tokenType: 'Bearer', expiresAt: '2096-02-29T23:45:00+05:30',
+      user: { id: 1, displayName: 'Operator', email: 'op@example.com', role: 'VIEWER' }
+    };
+    const invalidDates = [
+      '2099-02-29T12:00:00Z', '2099-04-31T12:00:00Z',
+      '2099-13-01T12:00:00Z', '2099-01-01T24:00:00Z',
+      '2099-01-01T12:60:00Z', '2099-01-01T12:00:00+24:00'
+    ];
+    const fetchMock = vi.fn();
+    for (const expiresAt of invalidDates) {
+      fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ ...valid, expiresAt }), { status: 200 }));
+    }
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(valid), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    for (const _date of invalidDates) {
+      await expect(login('op@example.com', 'password')).rejects.toEqual(new ApiError(
+        502, 'The server returned an invalid authentication response. Please retry or contact an administrator.'
+      ));
+    }
+    expect((await login('op@example.com', 'password')).expiresAt).toBe(valid.expiresAt);
+    expect(fetchMock).toHaveBeenCalledTimes(invalidDates.length + 1);
+  });
+
   it('fails closed on redirected API requests without retrying with credentials', async () => {
     const fetchMock = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
     vi.stubGlobal('fetch', fetchMock);

@@ -262,6 +262,27 @@ async function request<T>(
   }
 }
 
+/** Validate the actual calendar instant, not Date.parse's permissive normalization. */
+function validExpiry(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(Z|([+-])(\d{2}):(\d{2}))$/.exec(value);
+  if (!match) return false;
+  const [, year, month, day, hour, minute, second, , , sign, offsetHours, offsetMinutes] = match;
+  const offsetHour = Number(offsetHours ?? 0);
+  const offsetMinute = Number(offsetMinutes ?? 0);
+  if (offsetHour > 23 || offsetMinute > 59) return false;
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp) || timestamp <= Date.now()) return false;
+  const offset = sign === '-' ? -(offsetHour * 60 + offsetMinute) : offsetHour * 60 + offsetMinute;
+  const local = new Date(timestamp + offset * 60_000);
+  return local.getUTCFullYear() === Number(year) &&
+    local.getUTCMonth() + 1 === Number(month) &&
+    local.getUTCDate() === Number(day) &&
+    local.getUTCHours() === Number(hour) &&
+    local.getUTCMinutes() === Number(minute) &&
+    local.getUTCSeconds() === Number(second);
+}
+
 /** Reject malformed authentication envelopes before they can enter React state. */
 function isSession(value: unknown): value is Session {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
@@ -273,12 +294,8 @@ function isSession(value: unknown): value is Session {
     typeof session.accessToken === 'string' &&
     // Bearer credentials must be one token, without whitespace or controls.
     /^[A-Za-z0-9._~+/-]+={0,2}$/.test(session.accessToken) &&
-    typeof session.expiresAt === 'string' &&
-    // Explicit timezone avoids accepting ambiguous local timestamps.
-    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(session.expiresAt) &&
-    Number.isFinite(Date.parse(session.expiresAt)) &&
-    // An already-expired login must not become an authenticated UI session.
-    Date.parse(session.expiresAt) > Date.now() &&
+    // Require a real calendar date, explicit timezone and future expiry.
+    validExpiry(session.expiresAt) &&
     typeof operator.id === 'number' && Number.isSafeInteger(operator.id) && operator.id > 0 &&
     typeof operator.displayName === 'string' && operator.displayName.trim().length > 0 &&
     typeof operator.email === 'string' && operator.email.trim().length > 0 &&
