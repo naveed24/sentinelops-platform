@@ -124,7 +124,7 @@ export function getIncidentHistoryPage(
   token: string, incidentId: number, cursor: AuditCursor | null,
   size = 50, signal?: AbortSignal
 ): Promise<AuditEvent[]> {
-  return request<AuditEvent[]>(incidentHistoryCursorQuery(incidentId, cursor, size), { token, signal });
+  return requestList<AuditEvent>(incidentHistoryCursorQuery(incidentId, cursor, size), { token, signal });
 }
 
 export interface IncidentFilters {
@@ -313,8 +313,19 @@ export async function login(email: string, password: string): Promise<Session> {
   return session;
 }
 
+/** List endpoints must return arrays, never a successful object/error envelope. */
+async function requestList<T>(
+  path: string, options: { token?: string; signal?: AbortSignal } = {}
+): Promise<T[]> {
+  const result: unknown = await request<unknown>(path, options);
+  if (!Array.isArray(result)) {
+    throw new ApiError(502, 'The server returned an invalid response. Please retry or contact an administrator.');
+  }
+  return result as T[];
+}
+
 export function getServices(token: string, signal?: AbortSignal): Promise<ServiceRecord[]> {
-  return request<ServiceRecord[]>('/api/v1/services', { token, signal });
+  return requestList<ServiceRecord>('/api/v1/services', { token, signal });
 }
 
 export function incidentQuery(filters: IncidentFilters, page: number, limit: number): string {
@@ -328,13 +339,13 @@ export function incidentQuery(filters: IncidentFilters, page: number, limit: num
 export function getIncidents(
   token: string, filters: IncidentFilters, page: number, limit: number, signal?: AbortSignal
 ): Promise<Incident[]> {
-  return request<Incident[]>(incidentQuery(filters, page, limit), { token, signal });
+  return requestList<Incident>(incidentQuery(filters, page, limit), { token, signal });
 }
 
 export function getIncidentHistory(
   token: string, id: number, signal?: AbortSignal
 ): Promise<AuditEvent[]> {
-  return request<AuditEvent[]>('/api/v1/incidents/' + id + '/history?page=0&size=100', {
+  return requestList<AuditEvent>('/api/v1/incidents/' + id + '/history?page=0&size=100', {
     token, signal
   });
 }

@@ -76,6 +76,31 @@ describe('authenticated API client', () => {
     expect(fetchMock).toHaveBeenCalledTimes(invalidDates.length + 1);
   });
 
+  it('rejects object envelopes from successful list endpoints', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ items: [], message: 'unexpected envelope' }), { status: 200 })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const invalid = new ApiError(
+      502, 'The server returned an invalid response. Please retry or contact an administrator.'
+    );
+    await expect(getServices('secret')).rejects.toEqual(invalid);
+    await expect(getIncidents('secret', { status: '', severity: '', serviceId: '' }, 0, 25))
+      .rejects.toEqual(invalid);
+    await expect(getIncidentHistory('secret', 1)).rejects.toEqual(invalid);
+    await expect(getIncidentHistoryPage('secret', 1, null)).rejects.toEqual(invalid);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
+  it('accepts empty arrays from list endpoints', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('[]', { status: 200 })));
+    await expect(getServices('secret')).resolves.toEqual([]);
+    await expect(getIncidents('secret', { status: '', severity: '', serviceId: '' }, 0, 25))
+      .resolves.toEqual([]);
+    await expect(getIncidentHistory('secret', 1)).resolves.toEqual([]);
+    await expect(getIncidentHistoryPage('secret', 1, null)).resolves.toEqual([]);
+  });
+
   it('fails closed on redirected API requests without retrying with credentials', async () => {
     const fetchMock = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
     vi.stubGlobal('fetch', fetchMock);
