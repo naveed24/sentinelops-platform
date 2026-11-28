@@ -47,7 +47,7 @@ jobs:
           name: dashboard-dependency-lock
           path: web/package-lock.json
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 7
       - name: Run dashboard tests
         run: npm test
       - name: Typecheck and build dashboard

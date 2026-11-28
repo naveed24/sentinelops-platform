@@ -5,6 +5,7 @@ import {
 } from './api';
 import { displayTime, statusTone, summarize } from './summary';
 import { IncidentActions } from './IncidentActions';
+import { IncidentCreate } from './IncidentCreate';
 import { IncidentHistory } from './IncidentHistory';
 import { NotificationHealth } from './NotificationHealth';
 import { NotificationActivity } from './NotificationActivity';
@@ -82,6 +83,7 @@ function Dashboard({ session, onSignOut }: {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [historyRevision, setHistoryRevision] = useState(0);
   const [actionNotice, setActionNotice] = useState('');
+  const [creationNotice, setCreationNotice] = useState('');
   const handleNotificationUnauthorized = useCallback(() => {
     onSignOut('Your session expired. Please sign in again.');
   }, [onSignOut]);
@@ -120,12 +122,24 @@ function Dashboard({ session, onSignOut }: {
     setPage(0);
     setSelectedId(null);
     setActionNotice('');
+    setCreationNotice('');
   }
 
   function changePage(next: number) {
     setPage(next);
     setSelectedId(null);
     setActionNotice('');
+    setCreationNotice('');
+  }
+
+  function handleCreated(next: Incident) {
+    // The new incident may not match the current filters or page.
+    // Reset to newest-first and refetch from the authoritative API.
+    setFilters(initialFilters);
+    setPage(0);
+    setSelectedId(null);
+    setCreationNotice('Created incident INC-' + next.id + '. The incident feed is refreshing.');
+    setRevision((value) => value + 1);
   }
 
   function handleTransition(next: Incident) {
@@ -193,6 +207,10 @@ function Dashboard({ session, onSignOut }: {
         </section>
         <section className="section" id="incidents" aria-labelledby="incidents-heading">
           <div className="section-title"><div><p className="eyebrow">INCIDENT MANAGEMENT</p><h2 id="incidents-heading">Incident feed</h2></div><span className="muted small">Newest first · {PAGE_SIZE} per page</span></div>
+          <IncidentCreate token={session.accessToken} role={session.user.role}
+            services={services} onCreated={handleCreated}
+            onUnauthorized={handleNotificationUnauthorized} />
+          {creationNotice && <p role="status" className="notice">{creationNotice}</p>}
           <div className="filter-bar">
             <label>Status
               <select value={filters.status} onChange={(event) => changeFilter('status', event.target.value as IncidentFilters['status'])}>
