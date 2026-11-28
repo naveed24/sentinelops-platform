@@ -77,9 +77,9 @@ describe('authenticated API client', () => {
   });
 
   it('rejects object envelopes from successful list endpoints', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(
       new Response(JSON.stringify({ items: [], message: 'unexpected envelope' }), { status: 200 })
-    );
+    ));
     vi.stubGlobal('fetch', fetchMock);
     const invalid = new ApiError(
       502, 'The server returned an invalid response. Please retry or contact an administrator.'
@@ -93,12 +93,15 @@ describe('authenticated API client', () => {
   });
 
   it('accepts empty arrays from list endpoints', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('[]', { status: 200 })));
+    // Each network call returns a fresh Response: bodies are single-consumption streams.
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(new Response('[]', { status: 200 })));
+    vi.stubGlobal('fetch', fetchMock);
     await expect(getServices('secret')).resolves.toEqual([]);
     await expect(getIncidents('secret', { status: '', severity: '', serviceId: '' }, 0, 25))
       .resolves.toEqual([]);
     await expect(getIncidentHistory('secret', 1)).resolves.toEqual([]);
     await expect(getIncidentHistoryPage('secret', 1, null)).resolves.toEqual([]);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 
   it('fails closed on redirected API requests without retrying with credentials', async () => {
