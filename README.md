@@ -84,4 +84,4 @@ Alert rule management, event-driven occurrences, durable notification outbox and
 
 See [docs/architecture.md](docs/architecture.md) for the evolving system design.
 
-The first React operations console is available in [web/](web/README.md), with login, service health, incident filtering and audit history. Run `cd web && npm install && npm run dev` after starting the API.
+The first React operations console is available in [web/](web/README.md), with login, service health, incident filtering and audit history. Run `cd web && npm ci && npm run dev` after starting the API.

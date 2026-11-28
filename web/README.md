@@ -8,7 +8,7 @@ Start PostgreSQL and the Spring Boot API from the repository root (see the root 
 
 ```bash
 cd web
-npm install
+npm ci
 npm run dev
 ```
 
@@ -43,4 +43,4 @@ The CI dashboard job runs Vitest API/summary tests and a TypeScript-checked prod
 
 On pull requests and pushes to `main` or `feature/**`, the dashboard CI job runs the Vitest suite and the TypeScript-checked Vite production build. Only after both pass does it publish `sentinelops-dashboard-dist`, containing the generated `web/dist/` static assets, as a GitHub Actions artifact retained for seven days. The artifact is a build output for inspection or a separately controlled deployment pipeline; uploading it does **not** deploy the dashboard or make it publicly accessible. Deploy behind an HTTPS reverse proxy with same-origin `/api/` routing and security headers as described above.
 
-The job has a 15-minute timeout to bound stuck builds. Dependency installation currently uses `npm install`; a committed `package-lock.json` and `npm ci` remain required for reproducible installs. Do not treat a successful build as a supply-chain lockfile guarantee.
+The job has a 15-minute timeout to bound stuck builds. Dependency installation now uses the committed `package-lock.json` and `npm ci` on CI and for local development. Keep `web/package.json` and the lockfile together when updating dependencies. This pins resolved package versions and integrity hashes but does not replace vulnerability scanning or dependency review.
