@@ -351,6 +351,23 @@ export function getIncidentHistory(
 }
 
 
+
+export interface CreateIncidentRequest {
+  title: string;
+  description: string;
+  severity: IncidentSeverity;
+  serviceId: number;
+}
+
+/** The API enforces RBAC, validates service IDs, and records the creation audit event. */
+export function createIncident(
+  token: string, incident: CreateIncidentRequest, signal?: AbortSignal
+): Promise<Incident> {
+  return request<Incident>('/api/v1/incidents', {
+    token, method: 'POST', body: incident, signal
+  });
+}
+
 /** Optimistic concurrency is required for operator-driven lifecycle transitions. */
 export function transitionIncident(
   token: string, id: number, status: IncidentStatus, message: string,

@@ -108,3 +108,16 @@ td { font-size: 13px; }
 .notification-activity table { min-width: 860px; }
 .notification-activity .pagination { margin-top: 14px; }
 .notification-activity .notice { margin: 12px 0; }
+
+/* Incident creation: keep input controls usable on narrow operator screens. */
+.incident-create-form { margin: 0 0 20px; padding: 20px; background: #172c41; border: 1px solid #35516a; border-radius: 12px; display: grid; gap: 15px; }
+.incident-create-heading { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 10px; }
+.incident-create-fields { display: grid; grid-template-columns: minmax(180px, 2fr) minmax(160px, 1fr) minmax(150px, 1fr); gap: 14px; }
+.incident-create-fields label { display: grid; gap: 8px; color: #c0d4e6; font-size: 12px; font-weight: 700; min-width: 0; }
+.incident-create-fields input, .incident-create-fields select, .incident-create-fields textarea {
+  background: #182b40; color: #f2f7fc; border: 1px solid #37516b; border-radius: 8px; padding: 11px; width: 100%;
+}
+.incident-create-fields .incident-description { grid-column: 1 / -1; }
+.incident-create-fields textarea { resize: vertical; }
+.incident-create-form > .primary-button { justify-self: start; }
+@media (max-width: 850px) { .incident-create-fields { grid-template-columns: 1fr; } }
